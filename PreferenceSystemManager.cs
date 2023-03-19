@@ -161,7 +161,7 @@ namespace PreferenceSystem
             Set(key, value);
         }
 
-        public void AddOption<T>(string key, T initialValue, T[] values, string[] strings)
+        public PreferenceSystemManager AddOption<T>(string key, T initialValue, T[] values, string[] strings)
         {
             key = $"{MOD_GUID}:{key}";
             IsAllowedType(typeof(T), true);
@@ -208,6 +208,7 @@ namespace PreferenceSystem
                 _elements.Peek().Add((ElementType.FloatOption, new OptionData<string>(MOD_GUID, key, values.Cast<string>().ToList(), strings.ToList(), handler)));
             }
             keys.Add(key);
+            return this;
         }
 
         public T Get<T>(string key)
@@ -315,7 +316,7 @@ namespace PreferenceSystem
         }
 
 
-        public readonly struct LabelData
+        private readonly struct LabelData
         {
             public readonly string Text;
             public LabelData(string text)
@@ -323,7 +324,7 @@ namespace PreferenceSystem
                 Text = text;
             }
         }
-        public readonly struct InfoData
+        private readonly struct InfoData
         {
             public readonly string Text;
             public InfoData(string text)
@@ -331,7 +332,7 @@ namespace PreferenceSystem
                 Text = text;
             }
         }
-        public readonly struct SelectData
+        private readonly struct SelectData
         {
             public readonly List<string> Options;
             public readonly Action<int> OnActivate;
@@ -343,7 +344,7 @@ namespace PreferenceSystem
                 Index = index;
             }
         }
-        public readonly struct ButtonData
+        private readonly struct ButtonData
         {
             public readonly string ButtonText;
             public readonly Action<int> OnActivate;
@@ -359,7 +360,7 @@ namespace PreferenceSystem
                 Padding = padding;
             }
         }
-        public readonly struct PlayerRowData
+        private readonly struct PlayerRowData
         {
             public readonly string Username;
             public readonly PlayerInfo Player;
@@ -379,7 +380,7 @@ namespace PreferenceSystem
                 Padding = padding;
             }
         }
-        public readonly struct SubmenuButtonData
+        private readonly struct SubmenuButtonData
         {
             public readonly string ButtonText;
             public readonly Type MainMenuKey;
@@ -393,7 +394,7 @@ namespace PreferenceSystem
                 SkipStack = skip_stack;
             }
         }
-        public readonly struct ActionButtonData
+        private readonly struct ActionButtonData
         {
             public readonly string ButtonText;
             public readonly MenuAction Action;
@@ -405,7 +406,7 @@ namespace PreferenceSystem
                 Style = style;
             }
         }
-        public readonly struct OptionData<T>
+        private readonly struct OptionData<T>
         {
             public readonly string ModGUID;
             public readonly string Key;
@@ -422,32 +423,37 @@ namespace PreferenceSystem
             }
         }
 
-        public void AddLabel(string text)
+        public PreferenceSystemManager AddLabel(string text)
         {
             _elements.Peek().Add((ElementType.Label, new LabelData(text)));
+            return this;
         }
 
-        public void AddInfo(string text)
+        public PreferenceSystemManager AddInfo(string text)
         {
             _elements.Peek().Add((ElementType.Info, new InfoData(text)));
+            return this;
         }
 
-        public void AddSelect(List<string> options, Action<int> on_activate, int index = 0)
+        public PreferenceSystemManager AddSelect(List<string> options, Action<int> on_activate, int index = 0)
         {
             _elements.Peek().Add((ElementType.Select, new SelectData(options, on_activate, index)));
+            return this;
         }
 
-        public void AddButton(string button_text, Action<int> on_activate, int arg = 0, float scale = 1f, float padding = 0.2f)
+        public PreferenceSystemManager AddButton(string button_text, Action<int> on_activate, int arg = 0, float scale = 1f, float padding = 0.2f)
         {
             _elements.Peek().Add((ElementType.Button, new ButtonData(button_text, on_activate, arg, scale, padding)));
+            return this;
         }
 
-        public void AddPlayerRow(string username, PlayerInfo player, Action<int> on_kick, Action<int> on_remove, int arg = 0, float scale = 1f, float padding = 0.2f)
+        public PreferenceSystemManager AddPlayerRow(string username, PlayerInfo player, Action<int> on_kick, Action<int> on_remove, int arg = 0, float scale = 1f, float padding = 0.2f)
         {
             _elements.Peek().Add((ElementType.PlayerRow, new PlayerRowData(username, player, on_kick, on_remove, arg, scale, padding)));
+            return this;
         }
 
-        public void AddSubmenu(string button_text, string submenu_key, bool skip_stack = false)
+        public PreferenceSystemManager AddSubmenu(string button_text, string submenu_key, bool skip_stack = false)
         {
             Type mainTypeKey = CreateTypeKey($"{sWhitespace.Replace(MOD_NAME, "")}_{sWhitespace.Replace(submenu_key, "")}_Main");
             Type pauseTypeKey = CreateTypeKey($"{sWhitespace.Replace(MOD_NAME, "")}_{sWhitespace.Replace(submenu_key, "")}_Pause");
@@ -459,30 +465,35 @@ namespace PreferenceSystem
             _tempPauseMenuTypeKeys.Push(pauseTypeKey);
             _elements.Peek().Add((ElementType.SubmenuButton, new SubmenuButtonData(button_text, mainTypeKey, pauseTypeKey, skip_stack)));
             _elements.Push(new List<(ElementType, object)>());
+            return this;
         }
 
-        public void AddActionButton(string button_text, MenuAction action, ElementStyle style = ElementStyle.Default)
+        public PreferenceSystemManager AddActionButton(string button_text, MenuAction action, ElementStyle style = ElementStyle.Default)
         {
             _elements.Peek().Add((ElementType.Button, new ActionButtonData(button_text, action, style)));
+            return this;
         }
 
-        public void AddProfileSelector()
+        public PreferenceSystemManager AddProfileSelector()
         {
             _elements.Peek().Add((ElementType.ProfileSelector, null));
+            return this;
         }
 
-        public void AddSpacer()
+        public PreferenceSystemManager AddSpacer()
         {
             _elements.Peek().Add((ElementType.Spacer, null));
+            return this;
         }
 
-        public void SubmenuDone()
+        public PreferenceSystemManager SubmenuDone()
         {
             if (_elements.Count < 2)
             {
                 throw new Exception("Submenu depth already at highest level.");
             }
             CompletedSubmenuTransfer();
+            return this;
         }
 
         private Type CreateTypeKey(string typeName)
