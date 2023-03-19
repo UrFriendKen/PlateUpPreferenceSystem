@@ -55,7 +55,7 @@ namespace PreferenceSystem
 
         private PreferenceManager _kLPrefManager;
 
-        private static List<string> keys = new List<string>();
+        private List<string> keys = new List<string>();
         private Dictionary<string, PreferenceBool> boolPreferences = new Dictionary<string, PreferenceBool>();
         private Dictionary<string, PreferenceInt> intPreferences = new Dictionary<string, PreferenceInt>();
         private Dictionary<string, PreferenceFloat> floatPreferences = new Dictionary<string, PreferenceFloat>();
@@ -89,6 +89,7 @@ namespace PreferenceSystem
             Button,
             PlayerRow,
             SubmenuButton,
+            ProfileSelector,
             BoolOption,
             IntOption,
             FloatOption,
@@ -134,7 +135,7 @@ namespace PreferenceSystem
             throw new ArgumentException($"Type TPref is not supported! Only use {allowedTypesStr}.");
         }
 
-        private static bool IsUsedKey(string key, bool throwExceptionIfUsed = false)
+        private bool IsUsedKey(string key, bool throwExceptionIfUsed = false)
         {
             if (keys.Contains(key))
             {
@@ -465,6 +466,11 @@ namespace PreferenceSystem
             _elements.Peek().Add((ElementType.Button, new ActionButtonData(button_text, action, style)));
         }
 
+        public void AddProfileSelector()
+        {
+            _elements.Peek().Add((ElementType.ProfileSelector, null));
+        }
+
         public void AddSpacer()
         {
             _elements.Peek().Add((ElementType.Spacer, null));
@@ -516,13 +522,13 @@ namespace PreferenceSystem
 
                     Events.PreferenceMenu_MainMenu_CreateSubmenusEvent += (s, args) =>
                     {
-                        Submenu<MainMenuAction> submenu = new Submenu<MainMenuAction>(args.Container, args.Module_list, _kLPrefManager, submenuElements);
+                        Submenu<MainMenuAction> submenu = new Submenu<MainMenuAction>(args.Container, args.Module_list, MOD_GUID, _kLPrefManager, submenuElements);
                         args.Menus.Add(mainMenuKey, submenu);
                     };
 
                     Events.PreferenceMenu_PauseMenu_CreateSubmenusEvent += (s, args) =>
                     {
-                        Submenu<PauseMenuAction> submenu = new Submenu<PauseMenuAction>(args.Container, args.Module_list, _kLPrefManager, submenuElements);
+                        Submenu<PauseMenuAction> submenu = new Submenu<PauseMenuAction>(args.Container, args.Module_list, MOD_GUID, _kLPrefManager, submenuElements);
                         args.Menus.Add(pauseMenuKey, submenu);
                     };
                 }
@@ -542,17 +548,25 @@ namespace PreferenceSystem
 
         private class Submenu<T> : KLMenu<T>
         {
+            private readonly string _modGUID;
             private readonly PreferenceManager _kLPrefManager;
             private readonly List<(ElementType, object)> _elements;
 
-            public Submenu(Transform container, ModuleList module_list, PreferenceManager preferenceManager, List<(ElementType, object)> elements) : base(container, module_list)
+            public Submenu(Transform container, ModuleList module_list, string ModGUID, PreferenceManager preferenceManager, List<(ElementType, object)> elements) : base(container, module_list)
             {
+                _modGUID = ModGUID;
                 _kLPrefManager = preferenceManager;
                 _elements = elements;
             }
 
             public override void Setup(int player_id)
             {
+                Redraw(player_id);
+            }
+
+            private void Redraw(int player_id)
+            {
+                ModuleList.Clear();
                 foreach (var element in _elements)
                 {
                     switch (element.Item1)
@@ -603,6 +617,12 @@ namespace PreferenceSystem
                             Option<string> stringOption = new Option<string>(stringOptionData.Values, _kLPrefManager.GetPreference<PreferenceString>(stringOptionData.Key).Value, stringOptionData.Strings);
                             Add(stringOption);
                             stringOption.OnChanged += stringOptionData.EventHandler;
+                            break;
+                        case ElementType.ProfileSelector:
+                            AddProfileSelector(_modGUID, delegate (string s)
+                            {
+                                Redraw(player_id);
+                            }, _kLPrefManager, true);
                             break;
                         case ElementType.Spacer:
                             New<SpacerElement>();
