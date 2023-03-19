@@ -163,7 +163,6 @@ namespace PreferenceSystem
 
         public PreferenceSystemManager AddOption<T>(string key, T initialValue, T[] values, string[] strings)
         {
-            key = $"{MOD_GUID}:{key}";
             IsAllowedType(typeof(T), true);
             IsUsedKey(key, true);
 
@@ -215,44 +214,22 @@ namespace PreferenceSystem
         {
             IsAllowedType(typeof(T), true);
 
-            bool found = false;
             object value = default(T);
             if (typeof(T) == typeof(bool))
             {
-                if (boolPreferences.TryGetValue(key, out PreferenceBool preference))
-                {
-                    value = preference.Value;
-                    found = true;
-                }
+                value = _kLPrefManager.GetPreference<PreferenceBool>(key).Get();
             }
             else if (typeof(T) == typeof(int))
             {
-                if (intPreferences.TryGetValue(key, out PreferenceInt preference))
-                {
-                    value = preference.Value;
-                    found = true;
-                }
+                value = _kLPrefManager.GetPreference<PreferenceInt>(key).Get();
             }
             else if (typeof(T) == typeof(float))
             {
-                if (floatPreferences.TryGetValue(key, out PreferenceFloat preference))
-                {
-                    value = preference.Value;
-                    found = true;
-                }
+                value = _kLPrefManager.GetPreference<PreferenceFloat>(key).Get();
             }
             else if (typeof(T) == typeof(string))
             {
-                if (stringPreferences.TryGetValue(key, out PreferenceString preference))
-                {
-                    value = preference.Value;
-                    found = true;
-                }
-            }
-
-            if (!found)
-            {
-                //TODO Throw type mismatch exception. Key exists but type provided is not correct type.
+                value = _kLPrefManager.GetPreference<PreferenceString>(key).Get();
             }
             return (T)Convert.ChangeType(value, typeof(T));
         }
@@ -261,48 +238,23 @@ namespace PreferenceSystem
         {
             IsAllowedType(typeof(T), true);
             
-            bool found = false;
             if (typeof(T) == typeof(bool))
             {
-                if (boolPreferences.TryGetValue(key, out var preference))
-                {
-                    preference.Set((bool)Convert.ChangeType(value, typeof(bool)));
-                    found = true;
-                }
+                _kLPrefManager.GetPreference<PreferenceBool>(key).Set(ChangeType<bool>(value));
             }
             else if (typeof(T) == typeof(int))
             {
-                if (intPreferences.TryGetValue(key, out var preference))
-                {
-                    preference.Set((int)Convert.ChangeType(value, typeof(int)));
-                    found = true;
-                }
+                _kLPrefManager.GetPreference<PreferenceInt>(key).Set(ChangeType<int>(value));
             }
             else if (typeof(T) == typeof(float))
             {
-                if (floatPreferences.TryGetValue(key, out var preference))
-                {
-                    preference.Set((float)Convert.ChangeType(value, typeof(float)));
-                    found = true;
-                }
+                _kLPrefManager.GetPreference<PreferenceFloat>(key).Set(ChangeType<float>(value));
             }
             else if (typeof(T) == typeof(string))
             {
-                if (stringPreferences.TryGetValue(key, out var preference))
-                {
-                    preference.Set((string)Convert.ChangeType(value, typeof(string)));
-                    found = true;
-                }
+                _kLPrefManager.GetPreference<PreferenceString>(key).Set(ChangeType<string>(value));
             }
-
-            if (found)
-            {
-                Save();
-                return;
-            }
-
-            //TODO Throw type mismatch exception. Key exists but value not correct type.
-            ThrowTypeException();
+            Save();
         }
 
         private void Save()
