@@ -465,6 +465,7 @@ namespace PreferenceSystem
 
         public void RegisterMenu(MenuType menuType)
         {
+            _kLPrefManager.SetProfile(GlobalPreferences.GetProfile(MOD_GUID));
             Load();
             _tempMainMenuTypeKeys.Push(_mainTopLevelTypeKey);
             _tempPauseMenuTypeKeys.Push(_pauseTopLevelTypeKey);
