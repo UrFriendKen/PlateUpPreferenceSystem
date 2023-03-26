@@ -204,7 +204,7 @@ namespace PreferenceSystem
                 {
                     Preference_OnChanged(key, s);
                 };
-                _elements.Peek().Add((ElementType.FloatOption, new OptionData<string>(MOD_GUID, key, values.Cast<string>().ToList(), strings.ToList(), handler)));
+                _elements.Peek().Add((ElementType.StringOption, new OptionData<string>(MOD_GUID, key, values.Cast<string>().ToList(), strings.ToList(), handler)));
             }
             keys.Add(key);
             return this;
