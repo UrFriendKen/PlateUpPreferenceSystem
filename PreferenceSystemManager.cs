@@ -3,6 +3,7 @@ using Kitchen.Modules;
 using KitchenLib;
 using KitchenLib.Event;
 using KitchenLib.Preferences;
+using KitchenLib.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -87,9 +88,11 @@ namespace PreferenceSystem
             Info,
             Select,
             Button,
+            ButtonWithConfirm,
             PlayerRow,
             SubmenuButton,
             ProfileSelector,
+            DeleteProfileButton,
             BoolOption,
             IntOption,
             FloatOption,
@@ -312,6 +315,24 @@ namespace PreferenceSystem
                 Padding = padding;
             }
         }
+        private readonly struct ButtonWithConfirmData
+        {
+            public readonly string ButtonText;
+            public readonly string InfoText;
+            public readonly Action<GenericChoiceDecision> Callback;
+            public readonly int Arg;
+            public readonly float Scale;
+            public readonly float Padding;
+            public ButtonWithConfirmData(string button_text, string info_text, Action<GenericChoiceDecision> callback, int arg = 0, float scale = 1f, float padding = 0.2f)
+            {
+                ButtonText = button_text;
+                InfoText = info_text;
+                Callback = callback;
+                Arg = arg;
+                Scale = scale;
+                Padding = padding;
+            }
+        }
         private readonly struct PlayerRowData
         {
             public readonly string Username;
@@ -374,6 +395,20 @@ namespace PreferenceSystem
                 EventHandler = eventHandler;
             }
         }
+        private readonly struct DeleteProfileButtonData
+        {
+            public readonly string ButtonText;
+            public readonly int Arg;
+            public readonly float Scale;
+            public readonly float Padding;
+            public DeleteProfileButtonData(string button_text, int arg = 0, float scale = 1f, float padding = 0.2f)
+            {
+                ButtonText = button_text;
+                Arg = arg;
+                Scale = scale;
+                Padding = padding;
+            }
+        }
 
         public PreferenceSystemManager AddLabel(string text)
         {
@@ -396,6 +431,12 @@ namespace PreferenceSystem
         public PreferenceSystemManager AddButton(string button_text, Action<int> on_activate, int arg = 0, float scale = 1f, float padding = 0.2f)
         {
             _elements.Peek().Add((ElementType.Button, new ButtonData(button_text, on_activate, arg, scale, padding)));
+            return this;
+        }
+
+        public PreferenceSystemManager AddButtonWithConfirm(string button_text, string info_text, Action<GenericChoiceDecision> callback, int arg = 0, float scale = 1f, float padding = 0.2f)
+        {
+            _elements.Peek().Add((ElementType.ButtonWithConfirm, new ButtonWithConfirmData(button_text, info_text, callback, arg, scale, padding)));
             return this;
         }
 
@@ -429,6 +470,12 @@ namespace PreferenceSystem
         public PreferenceSystemManager AddProfileSelector()
         {
             _elements.Peek().Add((ElementType.ProfileSelector, null));
+            return this;
+        }
+
+        public PreferenceSystemManager AddDeleteProfileButton(string button_text = "Delete Profile", int arg = 0, float scale = 1f, float padding = 0.2f)
+        {
+            _elements.Peek().Add((ElementType.DeleteProfileButton, new DeleteProfileButtonData(button_text, arg, scale, padding)));
             return this;
         }
 
@@ -486,13 +533,23 @@ namespace PreferenceSystem
 
                     Events.PreferenceMenu_MainMenu_CreateSubmenusEvent += (s, args) =>
                     {
-                        Submenu<MainMenuAction> submenu = new Submenu<MainMenuAction>(args.Container, args.Module_list, MOD_GUID, _kLPrefManager, submenuElements);
+                        if (!args.Menus.TryGetValue(typeof(ConfirmMenu<MainMenuAction>), out Menu<MainMenuAction> confirmMenu))
+                        {
+                            confirmMenu = new ConfirmMenu<MainMenuAction>(args.Container, args.Module_list);
+                            args.Menus.Add(typeof(ConfirmMenu<MainMenuAction>), confirmMenu);
+                        }
+                        Submenu<MainMenuAction> submenu = new Submenu<MainMenuAction>(args.Container, args.Module_list, MOD_GUID, _kLPrefManager, submenuElements, (ConfirmMenu<MainMenuAction>)confirmMenu);
                         args.Menus.Add(mainMenuKey, submenu);
                     };
 
                     Events.PreferenceMenu_PauseMenu_CreateSubmenusEvent += (s, args) =>
                     {
-                        Submenu<PauseMenuAction> submenu = new Submenu<PauseMenuAction>(args.Container, args.Module_list, MOD_GUID, _kLPrefManager, submenuElements);
+                        if (!args.Menus.TryGetValue(typeof(ConfirmMenu<PauseMenuAction>), out Menu<PauseMenuAction> confirmMenu))
+                        {
+                            confirmMenu = new ConfirmMenu<PauseMenuAction>(args.Container, args.Module_list);
+                            args.Menus.Add(typeof(ConfirmMenu<PauseMenuAction>), confirmMenu);
+                        }
+                        Submenu<PauseMenuAction> submenu = new Submenu<PauseMenuAction>(args.Container, args.Module_list, MOD_GUID, _kLPrefManager, submenuElements, (ConfirmMenu<PauseMenuAction>)confirmMenu);
                         args.Menus.Add(pauseMenuKey, submenu);
                     };
                 }
@@ -515,12 +572,14 @@ namespace PreferenceSystem
             private readonly string _modGUID;
             private readonly PreferenceManager _kLPrefManager;
             private readonly List<(ElementType, object)> _elements;
+            private readonly ConfirmMenu<T> _confirmMenu;
 
-            public Submenu(Transform container, ModuleList module_list, string ModGUID, PreferenceManager preferenceManager, List<(ElementType, object)> elements) : base(container, module_list)
+            public Submenu(Transform container, ModuleList module_list, string ModGUID, PreferenceManager preferenceManager, List<(ElementType, object)> elements, ConfirmMenu<T> confirmMenu) : base(container, module_list)
             {
                 _modGUID = ModGUID;
                 _kLPrefManager = preferenceManager;
                 _elements = elements;
+                _confirmMenu = confirmMenu;
             }
 
             public override void Setup(int player_id)
@@ -548,6 +607,10 @@ namespace PreferenceSystem
                         case ElementType.Button:
                             ButtonData buttonData = (ButtonData)element.Item2;
                             AddButton(buttonData.ButtonText, buttonData.OnActivate, buttonData.Arg, buttonData.Scale, buttonData.Padding);
+                            break;
+                        case ElementType.ButtonWithConfirm:
+                            ButtonWithConfirmData buttonWithConfirmData = (ButtonWithConfirmData)element.Item2;
+                            AddButtonWithConfirm(buttonWithConfirmData.ButtonText, buttonWithConfirmData.InfoText, buttonWithConfirmData.Callback, buttonWithConfirmData.Arg, buttonWithConfirmData.Scale, buttonWithConfirmData.Padding);
                             break;
                         case ElementType.PlayerRow:
                             PlayerRowData playerRowData = (PlayerRowData)element.Item2;
@@ -588,6 +651,10 @@ namespace PreferenceSystem
                                 Redraw(player_id);
                             }, _kLPrefManager, true);
                             break;
+                        case ElementType.DeleteProfileButton:
+                            DeleteProfileButtonData deleteProfileButtonData = (DeleteProfileButtonData)element.Item2;
+                            AddDeleteProfileButton(deleteProfileButtonData.ButtonText, _kLPrefManager, deleteProfileButtonData.Arg, deleteProfileButtonData.Scale, deleteProfileButtonData.Padding);
+                            break;
                         case ElementType.Spacer:
                             New<SpacerElement>();
                             break;
@@ -599,6 +666,99 @@ namespace PreferenceSystem
                 {
                     RequestPreviousMenu();
                 });
+            }
+
+            protected void AddButtonWithConfirm(string label, string infoText, Action<GenericChoiceDecision> callback, int arg = 0, float scale = 1f, float padding = 0.2f)
+            {
+                AddButton(label, delegate (int _)
+                {
+                    _confirmMenu.SetAction(callback, infoText);
+                    RequestSubMenu(typeof(ConfirmMenu<T>));
+                }, arg, scale, padding);
+            }
+
+            protected void AddDeleteProfileButton(string label, PreferenceManager manager, int arg = 0, float scale = 1f, float padding = 0.2f)
+            {
+                AddButton(label, delegate (int _)
+                {
+                    string current_profile = GlobalPreferences.GetProfile(_modGUID);
+                    if (!current_profile.IsNullOrEmpty())
+                    {
+                        _confirmMenu.SetAction(delegate (GenericChoiceDecision decision)
+                        {
+                            if (decision == GenericChoiceDecision.Accept)
+                            {
+                                List<string> list = GlobalPreferences.GetProfiles(_modGUID).ToList();
+                                int currentProfileIndex = list.IndexOf(current_profile);
+
+                                if (currentProfileIndex == -1)
+                                {
+                                    Debug.LogError($"[PreferenceSystem] Failed to find index of {current_profile}.");
+                                }
+                                else
+                                {
+                                    GlobalPreferences.RemoveProfile(_modGUID, current_profile);
+                                    Debug.LogError($"[PreferenceSystem] Removed profile {current_profile}.");
+                                    string profileToLoad = "";
+                                    if (list.Count > 1)
+                                    {
+                                        if (currentProfileIndex > 0)
+                                            currentProfileIndex--;
+                                        else
+                                            currentProfileIndex++;
+                                        profileToLoad = list[currentProfileIndex];
+                                    }
+                                    if (!profileToLoad.IsNullOrEmpty())
+                                        GlobalPreferences.SetProfile(_modGUID, profileToLoad);
+                                    manager.SetProfile(profileToLoad);
+                                    manager.Load();
+                                    manager.Save();
+                                }
+                            }
+                        }, $"Delete preference profile, {current_profile}?");
+                        RequestSubMenu(typeof(ConfirmMenu<T>));
+                    }
+                }, arg, scale, padding);
+            }
+        }
+
+        public class ConfirmMenu<T> : KLMenu<T>
+        {
+            private string _infoText = String.Empty;
+            private Action<GenericChoiceDecision> _callback = null;
+
+            public ConfirmMenu(Transform container, ModuleList module_list) : base(container, module_list)
+            {
+            }
+
+            public override void Setup(int player_id)
+            {
+                AddLabel("Confirm?");
+                if (!_infoText.IsNullOrEmpty())
+                    AddInfo(_infoText);
+                New<SpacerElement>();
+                New<SpacerElement>();
+                AddButton("Accept", delegate (int _)
+                {
+                    Complete(GenericChoiceDecision.Accept);
+                });
+                AddButton("Cancel", delegate (int _)
+                {
+                    Complete(GenericChoiceDecision.Cancel);
+                });
+            }
+
+            protected void Complete(GenericChoiceDecision decision)
+            {
+                if (_callback != null)
+                    _callback(decision);
+                RequestPreviousMenu();
+            }
+
+            public void SetAction(Action<GenericChoiceDecision> callback, string infoText = "")
+            {
+                _infoText = infoText?? "";
+                _callback = callback;
             }
         }
     }
