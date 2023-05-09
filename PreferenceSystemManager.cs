@@ -11,6 +11,8 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Text.RegularExpressions;
 using UnityEngine;
+using UnityEngine.Rendering.LookDev;
+using UnityEngine.SocialPlatforms.Impl;
 
 namespace PreferenceSystem
 {
@@ -56,20 +58,21 @@ namespace PreferenceSystem
 
         private PreferenceManager _kLPrefManager;
 
-        private List<string> keys = new List<string>();
+        private Dictionary<string, Type> _registeredPreferences = new Dictionary<string, Type>();
         private Dictionary<string, PreferenceBool> boolPreferences = new Dictionary<string, PreferenceBool>();
         private Dictionary<string, PreferenceInt> intPreferences = new Dictionary<string, PreferenceInt>();
         private Dictionary<string, PreferenceFloat> floatPreferences = new Dictionary<string, PreferenceFloat>();
         private Dictionary<string, PreferenceString> stringPreferences = new Dictionary<string, PreferenceString>();
 
-
-        private static readonly Type[] allowedTypes = new Type[]
+        public static Type[] AllowedTypes => new Type[]
         {
             typeof(bool),
             typeof(int),
             typeof(float),
             typeof(string)
         };
+
+        public static Dictionary<string, Type> AllowedTypesDict => AllowedTypes.ToDictionary(x => x.FullName, x => x);
 
 
         private bool _mainMenuRegistered = false;
@@ -114,11 +117,13 @@ namespace PreferenceSystem
             _elements.Push(new List<(ElementType, object)>());
 
             _completedElements = new Queue<List<(ElementType, object)>>();
+
+            PreferenceSystemRegistry.Add(this);
         }
 
         private static bool IsAllowedType(Type type, bool throwExceptionIfNotAllowed = false)
         {
-            if (!allowedTypes.Contains(type))
+            if (!AllowedTypes.Contains(type))
             {
                 if (throwExceptionIfNotAllowed)
                     ThrowTypeException();
@@ -130,17 +135,17 @@ namespace PreferenceSystem
         private static void ThrowTypeException()
         {
             string allowedTypesStr = "";
-            for (int i = 0; i < allowedTypes.Length; i++)
+            for (int i = 0; i < AllowedTypes.Length; i++)
             {
-                allowedTypesStr += allowedTypes[i].ToString();
-                if (i != allowedTypes.Length - 1) allowedTypesStr += ", ";
+                allowedTypesStr += AllowedTypes[i].ToString();
+                if (i != AllowedTypes.Length - 1) allowedTypesStr += ", ";
             }
             throw new ArgumentException($"Type TPref is not supported! Only use {allowedTypesStr}.");
         }
 
         private bool IsUsedKey(string key, bool throwExceptionIfUsed = false)
         {
-            if (keys.Contains(key))
+            if (_registeredPreferences.ContainsKey(key))
             {
                 if (throwExceptionIfUsed)
                     ThrowKeyException(key);
@@ -166,6 +171,16 @@ namespace PreferenceSystem
 
         public PreferenceSystemManager AddOption<T>(string key, T initialValue, T[] values, string[] strings)
         {
+            return PrivateAddOption<T>(key, initialValue, values, strings, false);
+        }
+
+        public PreferenceSystemManager AddProperty<T>(string key, T initialValue)
+        {
+            return PrivateAddOption<T>(key, initialValue, null, null, true);
+        }
+
+        private PreferenceSystemManager PrivateAddOption<T>(string key, T initialValue, T[] values, string[] strings, bool doNotShow)
+        {
             IsAllowedType(typeof(T), true);
             IsUsedKey(key, true);
 
@@ -173,91 +188,126 @@ namespace PreferenceSystem
             {
                 PreferenceBool preference = _kLPrefManager.RegisterPreference(new PreferenceBool(key, ChangeType<bool>(initialValue)));
                 boolPreferences.Add(key, preference);
-                EventHandler<bool> handler = delegate (object _, bool b)
+                if (!doNotShow)
                 {
-                    Preference_OnChanged(key, b);
-                };
-                _elements.Peek().Add((ElementType.BoolOption, new OptionData<bool>(MOD_GUID, key, values.Cast<bool>().ToList(), strings.ToList(), handler)));
+                    EventHandler<bool> handler = delegate (object _, bool b)
+                    {
+                        Preference_OnChanged(key, b);
+                    };
+                    _elements.Peek().Add((ElementType.BoolOption, new OptionData<bool>(MOD_GUID, key, values.Cast<bool>().ToList(), strings.ToList(), handler)));
+                }
             }
             else if (typeof(T) == typeof(int))
             {
                 PreferenceInt preference = _kLPrefManager.RegisterPreference(new PreferenceInt(key, ChangeType<int>(initialValue)));
                 intPreferences.Add(key, preference);
-                EventHandler<int> handler = delegate (object _, int i)
+                if (!doNotShow)
                 {
-                    Preference_OnChanged(key, i);
-                };
-                _elements.Peek().Add((ElementType.IntOption, new OptionData<int>(MOD_GUID, key, values.Cast<int>().ToList(), strings.ToList(), handler)));
+                    EventHandler<int> handler = delegate (object _, int i)
+                    {
+                        Preference_OnChanged(key, i);
+                    };
+                    _elements.Peek().Add((ElementType.IntOption, new OptionData<int>(MOD_GUID, key, values.Cast<int>().ToList(), strings.ToList(), handler)));
+                }
             }
             else if (typeof(T) == typeof(float))
             {
                 PreferenceFloat preference = _kLPrefManager.RegisterPreference(new PreferenceFloat(key, ChangeType<float>(initialValue)));
                 floatPreferences.Add(key, preference);
-                EventHandler<float> handler = delegate (object _, float f)
+                if (!doNotShow)
                 {
-                    Preference_OnChanged(key, f);
-                };
-                _elements.Peek().Add((ElementType.FloatOption, new OptionData<float>(MOD_GUID, key, values.Cast<float>().ToList(), strings.ToList(), handler)));
+                    EventHandler<float> handler = delegate (object _, float f)
+                    {
+                        Preference_OnChanged(key, f);
+                    };
+                    _elements.Peek().Add((ElementType.FloatOption, new OptionData<float>(MOD_GUID, key, values.Cast<float>().ToList(), strings.ToList(), handler)));
+                }
             }
             else if (typeof(T) == typeof(string))
             {
                 PreferenceString preference = _kLPrefManager.RegisterPreference(new PreferenceString(key, ChangeType<string>(initialValue)));
                 stringPreferences.Add(key, preference);
-                EventHandler<string> handler = delegate (object _, string s)
+
+                if (!doNotShow)
                 {
-                    Preference_OnChanged(key, s);
-                };
-                _elements.Peek().Add((ElementType.StringOption, new OptionData<string>(MOD_GUID, key, values.Cast<string>().ToList(), strings.ToList(), handler)));
+                    EventHandler<string> handler = delegate (object _, string s)
+                    {
+                        Preference_OnChanged(key, s);
+                    };
+                    _elements.Peek().Add((ElementType.StringOption, new OptionData<string>(MOD_GUID, key, values.Cast<string>().ToList(), strings.ToList(), handler)));
+                }
             }
-            keys.Add(key);
+            _registeredPreferences.Add(key, typeof(T));
             return this;
         }
 
         public T Get<T>(string key)
         {
-            IsAllowedType(typeof(T), true);
+            return (T)(Get(key, typeof(T)) ?? default(T));
+        }
 
-            object value = default(T);
-            if (typeof(T) == typeof(bool))
+        private object Get(string key, Type valueType)
+        {
+            IsAllowedType(valueType, true);
+
+            object value = null;
+            if (valueType == typeof(bool))
             {
                 value = _kLPrefManager.GetPreference<PreferenceBool>(key).Get();
             }
-            else if (typeof(T) == typeof(int))
+            else if (valueType == typeof(int))
             {
                 value = _kLPrefManager.GetPreference<PreferenceInt>(key).Get();
             }
-            else if (typeof(T) == typeof(float))
+            else if (valueType == typeof(float))
             {
                 value = _kLPrefManager.GetPreference<PreferenceFloat>(key).Get();
             }
-            else if (typeof(T) == typeof(string))
+            else if (valueType == typeof(string))
             {
                 value = _kLPrefManager.GetPreference<PreferenceString>(key).Get();
             }
-            return (T)Convert.ChangeType(value, typeof(T));
+            return value;
         }
 
         public void Set<T>(string key, T value)
         {
-            IsAllowedType(typeof(T), true);
-            
-            if (typeof(T) == typeof(bool))
+            Set(key, typeof(T), value);
+        }
+
+        public void Set(string key, Type valueType , object value)
+        {
+            IsAllowedType(valueType, true);
+
+            if (valueType == typeof(bool))
             {
                 _kLPrefManager.GetPreference<PreferenceBool>(key).Set(ChangeType<bool>(value));
             }
-            else if (typeof(T) == typeof(int))
+            else if (valueType == typeof(int))
             {
                 _kLPrefManager.GetPreference<PreferenceInt>(key).Set(ChangeType<int>(value));
             }
-            else if (typeof(T) == typeof(float))
+            else if (valueType == typeof(float))
             {
                 _kLPrefManager.GetPreference<PreferenceFloat>(key).Set(ChangeType<float>(value));
             }
-            else if (typeof(T) == typeof(string))
+            else if (valueType == typeof(string))
             {
                 _kLPrefManager.GetPreference<PreferenceString>(key).Set(ChangeType<string>(value));
             }
             Save();
+        }
+
+        public void SetProfile(string profileName)
+        {
+            if (!GlobalPreferences.DoesProfileExist(MOD_GUID, profileName))
+            {
+                GlobalPreferences.AddProfile(MOD_GUID, profileName);
+            }
+            GlobalPreferences.SetProfile(MOD_GUID, profileName);
+            _kLPrefManager.SetProfile(profileName);
+            _kLPrefManager.Load();
+            _kLPrefManager.Save();
         }
 
         private void Save()
@@ -270,6 +320,37 @@ namespace PreferenceSystem
             _kLPrefManager.Load();
         }
 
+        internal PreferenceSystemManagerData GetData()
+        {
+            PreferenceSystemManagerData result = new PreferenceSystemManagerData()
+            {
+                ModGuid = MOD_GUID,
+                ModName = MOD_NAME
+            };
+            foreach (KeyValuePair<string, Type> pref in _registeredPreferences)
+            {
+                result.Add(pref.Key, Get(pref.Key, pref.Value));
+            }
+            return result;
+        }
+
+        internal bool LoadData(string preferenceSetName, PreferenceSystemManagerData data)
+        {
+            foreach (PreferenceData prefData in data.Preferences)
+            {
+                try
+                {
+                    SetProfile($"{preferenceSetName}_Loaded");
+                    Set(prefData.Key, prefData.ValueType, prefData.Value);
+                }
+                catch (Exception ex)
+                {
+                    Main.LogError($"{ex.Message}\n{ex.StackTrace}");
+                    return false;
+                }
+            }
+            return true;
+        }
 
         private readonly struct LabelData
         {
