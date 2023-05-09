@@ -281,19 +281,19 @@ namespace PreferenceSystem
 
             if (valueType == typeof(bool))
             {
-                _kLPrefManager.GetPreference<PreferenceBool>(key).Set(ChangeType<bool>(value));
+                _kLPrefManager.GetPreference<PreferenceBool>(key)?.Set(ChangeType<bool>(value));
             }
             else if (valueType == typeof(int))
             {
-                _kLPrefManager.GetPreference<PreferenceInt>(key).Set(ChangeType<int>(value));
+                _kLPrefManager.GetPreference<PreferenceInt>(key)?.Set(ChangeType<int>(value));
             }
             else if (valueType == typeof(float))
             {
-                _kLPrefManager.GetPreference<PreferenceFloat>(key).Set(ChangeType<float>(value));
+                _kLPrefManager.GetPreference<PreferenceFloat>(key)?.Set(ChangeType<float>(value));
             }
             else if (valueType == typeof(string))
             {
-                _kLPrefManager.GetPreference<PreferenceString>(key).Set(ChangeType<string>(value));
+                _kLPrefManager.GetPreference<PreferenceString>(key)?.Set(ChangeType<string>(value));
             }
             Save();
         }
