@@ -1,5 +1,6 @@
 ﻿using System;
-using System.Text;
+using System.IO;
+using System.IO.Compression;
 
 namespace PreferenceSystem.Utils
 {
@@ -7,13 +8,33 @@ namespace PreferenceSystem.Utils
     {
         public static string ToBase64(string text)
         {
-            var plainTextBytes = Encoding.UTF8.GetBytes(text);
-            return Convert.ToBase64String(plainTextBytes);
+            byte[] compressedBytes;
+            using (var memoryStream = new MemoryStream())
+            {
+                using (var gzipStream = new GZipStream(memoryStream, CompressionMode.Compress, true))
+                using (var writer = new StreamWriter(gzipStream))
+                {
+                    writer.Write(text);
+                }
+                compressedBytes = memoryStream.ToArray();
+            }
+            string compressedString = Convert.ToBase64String(compressedBytes);
+            return compressedString;
         }
         public static string FromBase64(string base64)
         {
-            var base64EncodedBytes = Convert.FromBase64String(base64);
-            return Encoding.UTF8.GetString(base64EncodedBytes);
+            byte[] compressedBytes = Convert.FromBase64String(base64);
+
+            string decompressedString;
+            using (var memoryStream = new MemoryStream(compressedBytes))
+            {
+                using (var gzipStream = new GZipStream(memoryStream, CompressionMode.Decompress))
+                using (var reader = new StreamReader(gzipStream))
+                {
+                    decompressedString = reader.ReadToEnd();
+                }
+            }
+            return decompressedString;
         }
     }
 }
