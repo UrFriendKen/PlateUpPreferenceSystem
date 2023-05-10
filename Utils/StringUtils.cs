@@ -11,13 +11,15 @@ namespace PreferenceSystem.Utils
             byte[] compressedBytes;
             using (var memoryStream = new MemoryStream())
             {
-                using (var gzipStream = new GZipStream(memoryStream, CompressionMode.Compress, true))
-                using (var writer = new StreamWriter(gzipStream))
+                using (var deflateStream = new DeflateStream(memoryStream, CompressionMode.Compress, true))
+                using (var writer = new StreamWriter(deflateStream))
                 {
                     writer.Write(text);
                 }
+
                 compressedBytes = memoryStream.ToArray();
             }
+
             string compressedString = Convert.ToBase64String(compressedBytes);
             return compressedString;
         }
@@ -28,8 +30,8 @@ namespace PreferenceSystem.Utils
             string decompressedString;
             using (var memoryStream = new MemoryStream(compressedBytes))
             {
-                using (var gzipStream = new GZipStream(memoryStream, CompressionMode.Decompress))
-                using (var reader = new StreamReader(gzipStream))
+                using (var deflateStream = new DeflateStream(memoryStream, CompressionMode.Decompress))
+                using (var reader = new StreamReader(deflateStream))
                 {
                     decompressedString = reader.ReadToEnd();
                 }
