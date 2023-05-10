@@ -11,8 +11,6 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Text.RegularExpressions;
 using UnityEngine;
-using UnityEngine.Rendering.LookDev;
-using UnityEngine.SocialPlatforms.Impl;
 
 namespace PreferenceSystem
 {
@@ -171,15 +169,23 @@ namespace PreferenceSystem
 
         public PreferenceSystemManager AddOption<T>(string key, T initialValue, T[] values, string[] strings)
         {
-            return PrivateAddOption<T>(key, initialValue, values, strings, false);
+            return PrivateAddOption<T>(key, initialValue, values, strings, false, null);
         }
 
-        public PreferenceSystemManager AddProperty<T>(string key, T initialValue)
+        public PreferenceSystemManager AddOption<T>(string key, T initialValue, T[] values, string[] strings, Action<T> on_changed)
         {
-            return PrivateAddOption<T>(key, initialValue, null, null, true);
+            return PrivateAddOption<T>(key, initialValue, values, strings, false, on_changed);
         }
 
-        private PreferenceSystemManager PrivateAddOption<T>(string key, T initialValue, T[] values, string[] strings, bool doNotShow)
+        public PreferenceSystemManager AddProperty<T>(string key, T initialValue, bool doLoad = false)
+        {
+            PrivateAddOption<T>(key, initialValue, null, null, true, null);
+            if (doLoad)
+                Load();
+            return this;
+        }
+
+        private PreferenceSystemManager PrivateAddOption<T>(string key, T initialValue, T[] values, string[] strings, bool doNotShow, Action<T> on_changed)
         {
             IsAllowedType(typeof(T), true);
             IsUsedKey(key, true);
@@ -193,6 +199,8 @@ namespace PreferenceSystem
                     EventHandler<bool> handler = delegate (object _, bool b)
                     {
                         Preference_OnChanged(key, b);
+                        if (on_changed != null)
+                            on_changed(ChangeType<T>(b));
                     };
                     _elements.Peek().Add((ElementType.BoolOption, new OptionData<bool>(MOD_GUID, key, values.Cast<bool>().ToList(), strings.ToList(), handler)));
                 }
@@ -206,6 +214,8 @@ namespace PreferenceSystem
                     EventHandler<int> handler = delegate (object _, int i)
                     {
                         Preference_OnChanged(key, i);
+                        if (on_changed != null)
+                            on_changed(ChangeType<T>(i));
                     };
                     _elements.Peek().Add((ElementType.IntOption, new OptionData<int>(MOD_GUID, key, values.Cast<int>().ToList(), strings.ToList(), handler)));
                 }
@@ -219,6 +229,8 @@ namespace PreferenceSystem
                     EventHandler<float> handler = delegate (object _, float f)
                     {
                         Preference_OnChanged(key, f);
+                        if (on_changed != null)
+                            on_changed(ChangeType<T>(f));
                     };
                     _elements.Peek().Add((ElementType.FloatOption, new OptionData<float>(MOD_GUID, key, values.Cast<float>().ToList(), strings.ToList(), handler)));
                 }
@@ -233,6 +245,8 @@ namespace PreferenceSystem
                     EventHandler<string> handler = delegate (object _, string s)
                     {
                         Preference_OnChanged(key, s);
+                        if (on_changed != null)
+                            on_changed(ChangeType<T>(s));
                     };
                     _elements.Peek().Add((ElementType.StringOption, new OptionData<string>(MOD_GUID, key, values.Cast<string>().ToList(), strings.ToList(), handler)));
                 }
@@ -253,19 +267,19 @@ namespace PreferenceSystem
             object value = null;
             if (valueType == typeof(bool))
             {
-                value = _kLPrefManager.GetPreference<PreferenceBool>(key).Get();
+                value = _kLPrefManager.GetPreference<PreferenceBool>(key)?.Get();
             }
             else if (valueType == typeof(int))
             {
-                value = _kLPrefManager.GetPreference<PreferenceInt>(key).Get();
+                value = _kLPrefManager.GetPreference<PreferenceInt>(key)?.Get();
             }
             else if (valueType == typeof(float))
             {
-                value = _kLPrefManager.GetPreference<PreferenceFloat>(key).Get();
+                value = _kLPrefManager.GetPreference<PreferenceFloat>(key)?.Get();
             }
             else if (valueType == typeof(string))
             {
-                value = _kLPrefManager.GetPreference<PreferenceString>(key).Get();
+                value = _kLPrefManager.GetPreference<PreferenceString>(key)?.Get();
             }
             return value;
         }
@@ -539,6 +553,14 @@ namespace PreferenceSystem
             _tempPauseMenuTypeKeys.Push(pauseTypeKey);
             _elements.Peek().Add((ElementType.SubmenuButton, new SubmenuButtonData(button_text, mainTypeKey, pauseTypeKey, skip_stack)));
             _elements.Push(new List<(ElementType, object)>());
+            return this;
+        }
+
+        public PreferenceSystemManager AddSelfRegisteredSubmenu<TMain, TPause>(string button_text, bool skip_stack = false) where TMain : Menu<MainMenuAction> where TPause : Menu<PauseMenuAction>
+        {
+            Type mainMenuType = typeof(TMain);
+            Type pauseMenuType = typeof(TPause);
+            _elements.Peek().Add((ElementType.SubmenuButton, new SubmenuButtonData(button_text, mainMenuType, pauseMenuType, skip_stack)));
             return this;
         }
 
