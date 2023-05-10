@@ -282,6 +282,7 @@ namespace PreferenceSystem
             {
                 if (PreferenceSystemRegistry.Import(_importBase64, out _importStatusMessage, nameOverride: _importNameOverride))
                 {
+                    _importBase64 = string.Empty;
                     _importNameOverride = string.Empty;
                     statusMessage = "Successfully imported preference set. Go to \"Load\" mode to activate the preference set.";
                 }
