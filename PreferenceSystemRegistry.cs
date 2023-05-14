@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using UnityEngine;
 
 namespace PreferenceSystem
@@ -109,9 +110,25 @@ namespace PreferenceSystem
             }
             return data;
         }
+
+        public bool RegisteredPreferencesSatisfiesCheck(PreferenceSystemManagerData check)
+        {
+            Dictionary<string, PreferenceData> registeredValues = GetPreferences().ToDictionary(x => x.Key, x => x);
+            foreach (PreferenceData checkData in check.Preferences)
+            {
+                if (!registeredValues.TryGetValue(checkData.Key, out PreferenceData data))
+                    continue;
+
+                if (checkData != data)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
-    public class PreferenceData
+    public class PreferenceData : IEquatable<PreferenceData>
     {
         public string Key;
         public string TypeKey;
@@ -128,6 +145,8 @@ namespace PreferenceSystem
                 return type;
             }
         }
+
+        private static Dictionary<Type, MethodInfo> _compareMethodsCache = new Dictionary<Type, MethodInfo>();
 
         public PreferenceData(string key, object value)
         {
@@ -149,6 +168,84 @@ namespace PreferenceSystem
             TypeKey = typeKey;
             Value = value;
         }
+
+        public override bool Equals(object obj)
+        {
+            if (!(obj is PreferenceData check))
+                return false;
+            return Equals(check);
+        }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
+        }
+
+        public bool Equals(PreferenceData other)
+        {
+            return Key == other.Key &&
+                TypeKey == other.TypeKey &&
+                ValueEquals();
+
+            bool ValueEquals()
+            {
+                if (Value.GetType() == other.GetType())
+                    return Value == other.Value;
+
+                if (IsIntegralNumericType(out bool signed))
+                {
+                    return signed ? IsSignedNumericValuesEqual(Value, other.Value) : IsUnsignedNumericValuesEqual(Value, other.Value);
+                }
+                return Value.GetHashCode() == other.Value.GetHashCode();
+            }
+
+            bool IsIntegralNumericType(out bool signed)
+            {
+                TypeCode typeCode = Type.GetTypeCode(ValueType);
+
+
+                if (typeCode == TypeCode.Int32 ||
+                    typeCode == TypeCode.Int64 ||
+                    typeCode == TypeCode.Int16 ||
+                    typeCode == TypeCode.SByte)
+                {
+                    signed = true;
+                    return true;
+                }
+
+                if (typeCode == TypeCode.UInt32 ||
+                    typeCode == TypeCode.UInt64 ||
+                    typeCode == TypeCode.UInt16 ||
+                    typeCode == TypeCode.Byte)
+                {
+                    signed = false;
+                    return true;
+                }
+
+                signed = false;
+                return false;
+            }
+
+            bool IsSignedNumericValuesEqual(object o1, object o2)
+            {
+                return (Convert.ToInt64(o1)).CompareTo(Convert.ToInt64(o2)) == 0;
+            }
+
+            bool IsUnsignedNumericValuesEqual(object o1, object o2)
+            {
+                return (Convert.ToUInt64(o1)).CompareTo(Convert.ToUInt64(o2)) == 0;
+            }
+        }
+
+        public static bool operator ==(PreferenceData left, PreferenceData right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(PreferenceData left, PreferenceData right)
+        {
+            return !left.Equals(right);
+        }
     }
 
     internal static class PreferenceSystemRegistry
@@ -157,6 +254,10 @@ namespace PreferenceSystem
 
         private static Dictionary<string, PreferenceSet> _preferenceSetsCache = new Dictionary<string, PreferenceSet>();
         private static Dictionary<string, string> _loadedPreferenceSetFilepaths = new Dictionary<string, string>();
+
+        public static string LastLoadedPreferenceSetName { get; private set; } = null;
+
+        public static bool IsPreferencesTampered => !IsPreferencesMatchLastLoadedSet();
 
         private struct RegisteredManager
         {
@@ -179,6 +280,16 @@ namespace PreferenceSystem
             public bool LoadPreferences(string preferenceSetName, PreferenceSystemManagerData managerData)
             {
                 return Manager.LoadData(preferenceSetName, managerData);
+            }
+
+            public T Get<T>(string preferenceID)
+            {
+                return Manager.Get<T>(preferenceID);
+            }
+
+            public bool CheckPreferences(PreferenceSystemManagerData check)
+            {
+                return GetData().RegisteredPreferencesSatisfiesCheck(check);
             }
         }
 
@@ -380,15 +491,50 @@ namespace PreferenceSystem
 
         public static void Load(string preferenceSetName)
         {
-            if (_preferenceSetsCache.TryGetValue(preferenceSetName, out PreferenceSet preferenceSet))
+            bool success = true;
+            if (!_preferenceSetsCache.TryGetValue(preferenceSetName, out PreferenceSet preferenceSet))
+            {
+                success = false;
+            }
+            else
             {
                 foreach (PreferenceSystemManagerData managerData in preferenceSet.Managers)
                 {
-                    LoadManagerData(preferenceSet.Name, managerData);
+                    if (!LoadManagerData(preferenceSet.Name, managerData))
+                        success = false;
                 }
             }
+            
+            if (success)
+            {
+                LastLoadedPreferenceSetName = preferenceSetName;
+            }
         }
-        
+
+        private static bool IsPreferencesMatchLastLoadedSet()
+        {
+            if (LastLoadedPreferenceSetName == null)
+                return true;
+
+            if (!_preferenceSetsCache.TryGetValue(LastLoadedPreferenceSetName, out PreferenceSet preferenceSet))
+            {
+                LastLoadedPreferenceSetName = null;
+                return true;
+            }
+
+            foreach (PreferenceSystemManagerData managerData in preferenceSet.Managers)
+            {
+                if (!_registeredPrefManagers.TryGetValue(managerData.ModGuid, out RegisteredManager manager))
+                    continue;
+
+                if (!manager.CheckPreferences(managerData))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         private static bool LoadManagerData(string preferenceSetName, PreferenceSystemManagerData managerData)
         {
             if (!_registeredPrefManagers.TryGetValue(managerData.ModGuid, out RegisteredManager manager))
@@ -421,6 +567,13 @@ namespace PreferenceSystem
         public static Dictionary<string, string> GetRegisteredMods()
         {
             return _registeredPrefManagers.ToDictionary(x => x.Key, x => x.Value.Name);
+        }
+
+        internal static T GetPreferenceValue<T>(string modGUID, string preferenceID)
+        {
+            if (!_registeredPrefManagers.TryGetValue(modGUID, out RegisteredManager manager))
+                return default;
+            return manager.Get<T>(preferenceID);
         }
     }
 }

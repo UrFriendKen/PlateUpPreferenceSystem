@@ -62,6 +62,9 @@ namespace PreferenceSystem
         private Dictionary<string, PreferenceFloat> floatPreferences = new Dictionary<string, PreferenceFloat>();
         private Dictionary<string, PreferenceString> stringPreferences = new Dictionary<string, PreferenceString>();
 
+        private Dictionary<string, object> _defaultValues;
+        public Dictionary<string, object> Defaults => new Dictionary<string, object>(_defaultValues);
+
         public static Type[] AllowedTypes => new Type[]
         {
             typeof(bool),
@@ -350,11 +353,11 @@ namespace PreferenceSystem
 
         internal bool LoadData(string preferenceSetName, PreferenceSystemManagerData data)
         {
+            SetProfile($"{preferenceSetName}_Loaded");
             foreach (PreferenceData prefData in data.Preferences)
             {
                 try
                 {
-                    SetProfile($"{preferenceSetName}_Loaded");
                     Set(prefData.Key, prefData.ValueType, prefData.Value);
                 }
                 catch (Exception ex)
@@ -362,6 +365,20 @@ namespace PreferenceSystem
                     Main.LogError($"{ex.Message}\n{ex.StackTrace}");
                     return false;
                 }
+            }
+            return true;
+        }
+
+        internal bool IsPreferencesEqual(PreferenceSystemManagerData data)
+        {
+            foreach (PreferenceData prefData in data.Preferences)
+            {
+                object value = Get(prefData.Key, prefData.ValueType);
+                if (value == null)
+                    continue;
+
+                if (prefData.Value != value)
+                    return false;
             }
             return true;
         }
@@ -613,8 +630,22 @@ namespace PreferenceSystem
             _pauseMenuTypeKeys.Enqueue(_tempPauseMenuTypeKeys.Pop());
         }
 
+        private void PopulateDefaults()
+        {
+            if (_defaultValues == null)
+            {
+                _defaultValues = new Dictionary<string, object>();
+                foreach (KeyValuePair<string, Type> pref in _registeredPreferences)
+                {
+                    _defaultValues.Add(pref.Key, Get(pref.Key, pref.Value));
+                }
+            }
+        }
+
         public void RegisterMenu(MenuType menuType)
         {
+            PopulateDefaults();
+
             _kLPrefManager.SetProfile(GlobalPreferences.GetProfile(MOD_GUID));
             Load();
             _tempMainMenuTypeKeys.Push(_mainTopLevelTypeKey);
