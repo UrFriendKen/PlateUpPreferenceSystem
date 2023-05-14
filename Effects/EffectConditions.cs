@@ -6,6 +6,7 @@ using Unity.Entities;
 
 namespace PreferenceSystem.Effects
 {
+
     public struct CEffectPreferenceCondition : IEffectCondition, IComponentData, IModComponent
     {
         public enum Condition
