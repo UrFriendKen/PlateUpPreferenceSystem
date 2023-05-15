@@ -33,7 +33,7 @@ namespace PreferenceSystem.Effects
     }
 
     [UpdateInGroup(typeof(ActivateEffectsGroup))]
-    public class ActivateEffectPreference : GameSystemBase
+    public class ActivateEffectPreference : GameSystemBase, IModSystem
     {
         EntityQuery AppliesEffects;
         protected override void Initialise()
