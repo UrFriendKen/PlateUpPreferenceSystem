@@ -10,7 +10,7 @@ namespace PreferenceSystem
     {
         public const string MOD_GUID = "IcedMilo.PlateUp.PreferenceSystem";
         public const string MOD_NAME = "PreferenceSystem";
-        public const string MOD_VERSION = "0.2.2";
+        public const string MOD_VERSION = "0.2.3";
         public const string MOD_AUTHOR = "IcedMilo";
         public const string MOD_GAMEVERSION = ">=1.1.5";
 

@@ -842,8 +842,7 @@ namespace PreferenceSystem
                                             currentProfileIndex++;
                                         profileToLoad = list[currentProfileIndex];
                                     }
-                                    if (!profileToLoad.IsNullOrEmpty())
-                                        GlobalPreferences.SetProfile(_modGUID, profileToLoad);
+                                    GlobalPreferences.SetProfile(_modGUID, profileToLoad);
                                     manager.SetProfile(profileToLoad);
                                     manager.Load();
                                     manager.Save();
