@@ -4,6 +4,7 @@ using KitchenLib;
 using KitchenLib.Event;
 using KitchenLib.Preferences;
 using KitchenLib.Utils;
+using MessagePack;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -180,6 +181,11 @@ namespace PreferenceSystem
             return PrivateAddOption<T>(key, initialValue, values, strings, false, on_changed);
         }
 
+        public PreferenceSystemManager AddOption<T>(string key, T initialValue, T[] values, string[] strings, Action<T> on_changed, bool redraw)
+        {
+            return PrivateAddOption<T>(key, initialValue, values, strings, false, on_changed, redraw);
+        }
+
         public PreferenceSystemManager AddProperty<T>(string key, T initialValue, bool doLoad = false)
         {
             PrivateAddOption<T>(key, initialValue, null, null, true, null);
@@ -188,7 +194,7 @@ namespace PreferenceSystem
             return this;
         }
 
-        private PreferenceSystemManager PrivateAddOption<T>(string key, T initialValue, T[] values, string[] strings, bool doNotShow, Action<T> on_changed)
+        private PreferenceSystemManager PrivateAddOption<T>(string key, T initialValue, T[] values, string[] strings, bool doNotShow, Action<T> on_changed, bool redraw = false)
         {
             IsAllowedType(typeof(T), true);
             IsUsedKey(key, true);
@@ -205,7 +211,7 @@ namespace PreferenceSystem
                         if (on_changed != null)
                             on_changed(ChangeType<T>(b));
                     };
-                    _elements.Peek().Add((ElementType.BoolOption, new OptionData<bool>(MOD_GUID, key, values.Cast<bool>().ToList(), strings.ToList(), handler)));
+                    _elements.Peek().Add((ElementType.BoolOption, new OptionData<bool>(MOD_GUID, key, values.Cast<bool>().ToList(), strings.ToList(), handler, redraw)));
                 }
             }
             else if (typeof(T) == typeof(int))
@@ -220,7 +226,7 @@ namespace PreferenceSystem
                         if (on_changed != null)
                             on_changed(ChangeType<T>(i));
                     };
-                    _elements.Peek().Add((ElementType.IntOption, new OptionData<int>(MOD_GUID, key, values.Cast<int>().ToList(), strings.ToList(), handler)));
+                    _elements.Peek().Add((ElementType.IntOption, new OptionData<int>(MOD_GUID, key, values.Cast<int>().ToList(), strings.ToList(), handler, redraw)));
                 }
             }
             else if (typeof(T) == typeof(float))
@@ -235,7 +241,7 @@ namespace PreferenceSystem
                         if (on_changed != null)
                             on_changed(ChangeType<T>(f));
                     };
-                    _elements.Peek().Add((ElementType.FloatOption, new OptionData<float>(MOD_GUID, key, values.Cast<float>().ToList(), strings.ToList(), handler)));
+                    _elements.Peek().Add((ElementType.FloatOption, new OptionData<float>(MOD_GUID, key, values.Cast<float>().ToList(), strings.ToList(), handler, redraw)));
                 }
             }
             else if (typeof(T) == typeof(string))
@@ -251,7 +257,7 @@ namespace PreferenceSystem
                         if (on_changed != null)
                             on_changed(ChangeType<T>(s));
                     };
-                    _elements.Peek().Add((ElementType.StringOption, new OptionData<string>(MOD_GUID, key, values.Cast<string>().ToList(), strings.ToList(), handler)));
+                    _elements.Peek().Add((ElementType.StringOption, new OptionData<string>(MOD_GUID, key, values.Cast<string>().ToList(), strings.ToList(), handler, redraw)));
                 }
             }
             _registeredPreferences.Add(key, typeof(T));
@@ -404,11 +410,13 @@ namespace PreferenceSystem
             public readonly List<string> Options;
             public readonly Action<int> OnActivate;
             public readonly int Index;
-            public SelectData(List<string> options, Action<int> on_activate, int index = 0)
+            public readonly bool Redraw;
+            public SelectData(List<string> options, Action<int> on_activate, int index = 0, bool redraw = false)
             {
                 Options = options;
                 OnActivate = on_activate;
                 Index = index;
+                Redraw = redraw;
             }
         }
         private readonly struct ButtonData
@@ -498,13 +506,16 @@ namespace PreferenceSystem
             public readonly List<T> Values;
             public readonly List<string> Strings;
             public readonly EventHandler<T> EventHandler;
-            public OptionData(string modGuid, string key, List<T> values, List<string> strings, EventHandler<T> eventHandler)
+            public readonly bool Redraw;
+
+            public OptionData(string modGuid, string key, List<T> values, List<string> strings, EventHandler<T> eventHandler, bool redraw)
             {
                 ModGUID = modGuid;
                 Key = key;
                 Values = values;
                 Strings = strings;
                 EventHandler = eventHandler;
+                Redraw = redraw;
             }
         }
         private readonly struct DeleteProfileButtonData
@@ -534,9 +545,9 @@ namespace PreferenceSystem
             return this;
         }
 
-        public PreferenceSystemManager AddSelect(List<string> options, Action<int> on_activate, int index = 0)
+        public PreferenceSystemManager AddSelect(List<string> options, Action<int> on_activate, int index = 0, bool redraw = false)
         {
-            _elements.Peek().Add((ElementType.Select, new SelectData(options, on_activate, index)));
+            _elements.Peek().Add((ElementType.Select, new SelectData(options, on_activate, index, redraw)));
             return this;
         }
 
@@ -721,11 +732,15 @@ namespace PreferenceSystem
                 Redraw(player_id);
             }
 
-            private void Redraw(int player_id)
+            private void Redraw(int player_id, int selectElementIndex = -1)
             {
+                Main.LogWarning(selectElementIndex);
                 ModuleList.Clear();
-                foreach (var element in _elements)
+                for (int i = 0; i < _elements.Count; i++)
                 {
+                    int elementIndex = i;
+                    var element = _elements[i];
+                    Element menuElement = null;
                     switch (element.Item1)
                     {
                         case ElementType.Label:
@@ -736,7 +751,14 @@ namespace PreferenceSystem
                             break;
                         case ElementType.Select:
                             SelectData selectData = (SelectData)element.Item2;
-                            AddSelect(selectData.Options, selectData.OnActivate, selectData.Index);
+                            menuElement = AddSelect(selectData.Options, delegate(int selectDataIndex)
+                            {
+                                selectData.OnActivate(selectDataIndex);
+                                if (selectData.Redraw)
+                                {
+                                    Redraw(player_id, elementIndex);
+                                }
+                            }, selectData.Index);
                             break;
                         case ElementType.Button:
                             ButtonData buttonData = (ButtonData)element.Item2;
@@ -758,31 +780,59 @@ namespace PreferenceSystem
                         case ElementType.BoolOption:
                             OptionData<bool> boolOptionData = (OptionData<bool>)element.Item2;
                             Option<bool> boolOption = new Option<bool>(boolOptionData.Values, _kLPrefManager.GetPreference<PreferenceBool>(boolOptionData.Key).Value, boolOptionData.Strings);
-                            Add(boolOption);
+                            menuElement = AddSelect(boolOption);
                             boolOption.OnChanged += boolOptionData.EventHandler;
+                            if (boolOptionData.Redraw)
+                            {
+                                boolOption.OnChanged += delegate (object _, bool _)
+                                {
+                                    Redraw(player_id, elementIndex);
+                                };
+                            }
                             break;
                         case ElementType.IntOption:
                             OptionData<int> intOptionData = (OptionData<int>)element.Item2;
                             Option<int> intOption = new Option<int>(intOptionData.Values, _kLPrefManager.GetPreference<PreferenceInt>(intOptionData.Key).Value, intOptionData.Strings);
-                            Add(intOption);
+                            menuElement = AddSelect(intOption);
                             intOption.OnChanged += intOptionData.EventHandler;
+                            if (intOptionData.Redraw)
+                            {
+                                intOption.OnChanged += delegate (object _, int _)
+                                {
+                                    Redraw(player_id, elementIndex);
+                                };
+                            }
                             break;
                         case ElementType.FloatOption:
                             OptionData<float> floatOptionData = (OptionData<float>)element.Item2;
                             Option<float> floatOption = new Option<float>(floatOptionData.Values, _kLPrefManager.GetPreference<PreferenceFloat>(floatOptionData.Key).Value, floatOptionData.Strings);
-                            Add(floatOption);
+                            menuElement = AddSelect(floatOption);
                             floatOption.OnChanged += floatOptionData.EventHandler;
+                            if (floatOptionData.Redraw)
+                            {
+                                floatOption.OnChanged += delegate (object _, float _)
+                                {
+                                    Redraw(player_id, elementIndex);
+                                };
+                            }
                             break;
                         case ElementType.StringOption:
                             OptionData<string> stringOptionData = (OptionData<string>)element.Item2;
                             Option<string> stringOption = new Option<string>(stringOptionData.Values, _kLPrefManager.GetPreference<PreferenceString>(stringOptionData.Key).Value, stringOptionData.Strings);
-                            Add(stringOption);
+                            menuElement = AddSelect(stringOption);
                             stringOption.OnChanged += stringOptionData.EventHandler;
+                            if (stringOptionData.Redraw)
+                            {
+                                stringOption.OnChanged += delegate (object _, string _)
+                                {
+                                    Redraw(player_id, elementIndex);
+                                };
+                            }
                             break;
                         case ElementType.ProfileSelector:
                             AddProfileSelector(_modGUID, delegate (string s)
                             {
-                                Redraw(player_id);
+                                Redraw(player_id, i);
                             }, _kLPrefManager, true);
                             break;
                         case ElementType.DeleteProfileButton:
@@ -795,6 +845,12 @@ namespace PreferenceSystem
                         default:
                             break;
                     }
+
+                    if (menuElement != null && selectElementIndex == i)
+                    {
+                        ModuleList.Select(menuElement);
+                    }
+
                 }
                 AddButton(base.Localisation["MENU_BACK_SETTINGS"], delegate
                 {
@@ -802,9 +858,9 @@ namespace PreferenceSystem
                 });
             }
 
-            protected void AddButtonWithConfirm(string label, string infoText, Action<GenericChoiceDecision> callback, int arg = 0, float scale = 1f, float padding = 0.2f)
+            protected ButtonElement AddButtonWithConfirm(string label, string infoText, Action<GenericChoiceDecision> callback, int arg = 0, float scale = 1f, float padding = 0.2f)
             {
-                AddButton(label, delegate (int _)
+                return AddButton(label, delegate (int _)
                 {
                     _confirmMenu.SetAction(callback, infoText);
                     RequestSubMenu(typeof(ConfirmMenu<T>));
