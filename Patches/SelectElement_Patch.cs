@@ -11,8 +11,8 @@ namespace PreferenceSystem.Patches
     [HarmonyPatch]
     static class SelectElement_Patch
     {
-        const float LOWER_THRESHOLD = 0.8f;
-        const float MAX_SPEED = 8f;
+        const float LOWER_THRESHOLD = 0.5f;
+        const float MAX_SPEED = 5f;
         const float MIN_DELAY = 0.05f;
         static float _progress = 0f;
         static float _heldTime = 0f;
@@ -47,13 +47,16 @@ namespace PreferenceSystem.Patches
 
             if (scrollDirection.Count != 1)
             {
-                Main.LogError("Return");
                 _heldTime = 0f;
                 _progress = 0f;
                 return;
             }
 
-            Main.LogWarning(_progress);
+            if (isPressed)
+            {
+                _heldTime = 0f;
+                _progress = 0f;
+            }
 
             if (isPressed || (_heldTime > LOWER_THRESHOLD && _progress > MAX_SPEED / _heldTime * MIN_DELAY))
             {
