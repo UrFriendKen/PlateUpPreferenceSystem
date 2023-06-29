@@ -5,9 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace PreferenceSystem
+namespace PreferenceSystem.Menus
 {
-    public class PreferenceSystemMenu : BaseUI
+    public class PreferenceSetsMenu : BaseUI
     {
         public const float TOTAL_DRAWABLE_WIDTH = 800f;
         public const float TOTAL_DRAWABLE_HEIGHT = 1070f;
@@ -19,8 +19,8 @@ namespace PreferenceSystem
 
         public const string LEFT_ARROW = "<==";
         public const string RIGHT_ARROW = "==>";
-        
-        public PreferenceSystemMenu()
+
+        public PreferenceSetsMenu()
         {
             ButtonName = "PrefSys";
         }
@@ -83,7 +83,7 @@ namespace PreferenceSystem
 
             _previewStyle = new GUIStyle(GUI.skin.textArea);
             _previewStyle.stretchHeight = true;
-            
+
             GUI.DrawTexture(new Rect(0f, 0f, TOTAL_DRAWABLE_WIDTH, TOTAL_DRAWABLE_HEIGHT), _background, ScaleMode.StretchToFill);
             GUILayout.BeginArea(new Rect((TOTAL_DRAWABLE_WIDTH - WINDOW_WIDTH) / 2, 10f, WINDOW_WIDTH, WINDOW_HEIGHT));
 
@@ -119,9 +119,9 @@ namespace PreferenceSystem
                     GUILayout.BeginHorizontal(GUILayout.Width(width));
 
                 int fullRowsDrawn = i / maxColCount;
-                int buttonsInRow = Mathf.Min(Modes.Count - (fullRowsDrawn * maxColCount), maxColCount);
+                int buttonsInRow = Mathf.Min(Modes.Count - fullRowsDrawn * maxColCount, maxColCount);
 
-                if (GUILayout.Button(text, GUILayout.Width(width/buttonsInRow - HARDCODED_DEFAULT_PADDING), GUILayout.Height(buttonHeight - HARDCODED_DEFAULT_PADDING)))
+                if (GUILayout.Button(text, GUILayout.Width(width / buttonsInRow - HARDCODED_DEFAULT_PADDING), GUILayout.Height(buttonHeight - HARDCODED_DEFAULT_PADDING)))
                 {
                     ModeChanged = true;
                     SelectedMode = mode;
@@ -251,7 +251,7 @@ namespace PreferenceSystem
             GUILayout.Label("");
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Preview:",GUILayout.Width(WINDOW_WIDTH * 0.8f));
+            GUILayout.Label("Preview:", GUILayout.Width(WINDOW_WIDTH * 0.8f));
             if (GUILayout.Button("Copy") && !previewText.IsNullOrEmpty())
             {
                 GUIUtility.systemCopyBuffer = previewText;

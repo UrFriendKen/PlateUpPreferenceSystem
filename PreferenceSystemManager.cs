@@ -1,10 +1,9 @@
 ﻿using Kitchen;
 using Kitchen.Modules;
-using KitchenLib;
-using KitchenLib.Event;
-using KitchenLib.Preferences;
-using KitchenLib.Utils;
-using MessagePack;
+using PreferenceSystem.Preferences;
+using PreferenceSystem.Event;
+using PreferenceSystem.Menus;
+using PreferenceSystem.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -44,10 +43,10 @@ namespace PreferenceSystem
         public readonly string MOD_GUID;
         public readonly string MOD_NAME;
 
-        private bool _isKLPreferencesEventsRegistered = false;
-        public bool IsKLPreferencesEventsRegistered
+        private bool _isPreferencesEventsRegistered = false;
+        public bool IsPreferencesEventsRegistered
         {
-            get { return _isKLPreferencesEventsRegistered; }
+            get { return _isPreferencesEventsRegistered; }
         }
 
         AssemblyBuilder _assemblyBuilder;
@@ -55,7 +54,7 @@ namespace PreferenceSystem
 
         private static readonly Regex sWhitespace = new Regex(@"\s+");
 
-        private PreferenceManager _kLPrefManager;
+        private PreferenceManager _prefManager;
 
         private Dictionary<string, Type> _registeredPreferences = new Dictionary<string, Type>();
         private Dictionary<string, PreferenceBool> boolPreferences = new Dictionary<string, PreferenceBool>();
@@ -109,7 +108,7 @@ namespace PreferenceSystem
         {
             MOD_GUID = modGUID;
             MOD_NAME = modName;
-            _kLPrefManager = new PreferenceManager(modGUID);
+            _prefManager = new PreferenceManager(modGUID);
 
             _assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName($"{this.GetType().Namespace}.{MOD_GUID}"), AssemblyBuilderAccess.Run);
             _moduleBuilder = _assemblyBuilder.DefineDynamicModule("Module");
@@ -201,7 +200,7 @@ namespace PreferenceSystem
 
             if (typeof(T) == typeof(bool))
             {
-                PreferenceBool preference = _kLPrefManager.RegisterPreference(new PreferenceBool(key, ChangeType<bool>(initialValue)));
+                PreferenceBool preference = _prefManager.RegisterPreference(new PreferenceBool(key, ChangeType<bool>(initialValue)));
                 boolPreferences.Add(key, preference);
                 if (!doNotShow)
                 {
@@ -216,7 +215,7 @@ namespace PreferenceSystem
             }
             else if (typeof(T) == typeof(int))
             {
-                PreferenceInt preference = _kLPrefManager.RegisterPreference(new PreferenceInt(key, ChangeType<int>(initialValue)));
+                PreferenceInt preference = _prefManager.RegisterPreference(new PreferenceInt(key, ChangeType<int>(initialValue)));
                 intPreferences.Add(key, preference);
                 if (!doNotShow)
                 {
@@ -231,7 +230,7 @@ namespace PreferenceSystem
             }
             else if (typeof(T) == typeof(float))
             {
-                PreferenceFloat preference = _kLPrefManager.RegisterPreference(new PreferenceFloat(key, ChangeType<float>(initialValue)));
+                PreferenceFloat preference = _prefManager.RegisterPreference(new PreferenceFloat(key, ChangeType<float>(initialValue)));
                 floatPreferences.Add(key, preference);
                 if (!doNotShow)
                 {
@@ -246,7 +245,7 @@ namespace PreferenceSystem
             }
             else if (typeof(T) == typeof(string))
             {
-                PreferenceString preference = _kLPrefManager.RegisterPreference(new PreferenceString(key, ChangeType<string>(initialValue)));
+                PreferenceString preference = _prefManager.RegisterPreference(new PreferenceString(key, ChangeType<string>(initialValue)));
                 stringPreferences.Add(key, preference);
 
                 if (!doNotShow)
@@ -276,19 +275,19 @@ namespace PreferenceSystem
             object value = null;
             if (valueType == typeof(bool))
             {
-                value = _kLPrefManager.GetPreference<PreferenceBool>(key)?.Get();
+                value = _prefManager.GetPreference<PreferenceBool>(key)?.Get();
             }
             else if (valueType == typeof(int))
             {
-                value = _kLPrefManager.GetPreference<PreferenceInt>(key)?.Get();
+                value = _prefManager.GetPreference<PreferenceInt>(key)?.Get();
             }
             else if (valueType == typeof(float))
             {
-                value = _kLPrefManager.GetPreference<PreferenceFloat>(key)?.Get();
+                value = _prefManager.GetPreference<PreferenceFloat>(key)?.Get();
             }
             else if (valueType == typeof(string))
             {
-                value = _kLPrefManager.GetPreference<PreferenceString>(key)?.Get();
+                value = _prefManager.GetPreference<PreferenceString>(key)?.Get();
             }
             return value;
         }
@@ -304,19 +303,19 @@ namespace PreferenceSystem
 
             if (valueType == typeof(bool))
             {
-                _kLPrefManager.GetPreference<PreferenceBool>(key)?.Set(ChangeType<bool>(value));
+                _prefManager.GetPreference<PreferenceBool>(key)?.Set(ChangeType<bool>(value));
             }
             else if (valueType == typeof(int))
             {
-                _kLPrefManager.GetPreference<PreferenceInt>(key)?.Set(ChangeType<int>(value));
+                _prefManager.GetPreference<PreferenceInt>(key)?.Set(ChangeType<int>(value));
             }
             else if (valueType == typeof(float))
             {
-                _kLPrefManager.GetPreference<PreferenceFloat>(key)?.Set(ChangeType<float>(value));
+                _prefManager.GetPreference<PreferenceFloat>(key)?.Set(ChangeType<float>(value));
             }
             else if (valueType == typeof(string))
             {
-                _kLPrefManager.GetPreference<PreferenceString>(key)?.Set(ChangeType<string>(value));
+                _prefManager.GetPreference<PreferenceString>(key)?.Set(ChangeType<string>(value));
             }
             Save();
         }
@@ -328,19 +327,19 @@ namespace PreferenceSystem
                 GlobalPreferences.AddProfile(MOD_GUID, profileName);
             }
             GlobalPreferences.SetProfile(MOD_GUID, profileName);
-            _kLPrefManager.SetProfile(profileName);
-            _kLPrefManager.Load();
-            _kLPrefManager.Save();
+            _prefManager.SetProfile(profileName);
+            _prefManager.Load();
+            _prefManager.Save();
         }
 
         private void Save()
         {
-            _kLPrefManager.Save();
+            _prefManager.Save();
         }
 
         private void Load()
         {
-            _kLPrefManager.Load();
+            _prefManager.Load();
         }
 
         internal PreferenceSystemManagerData GetData()
@@ -628,7 +627,7 @@ namespace PreferenceSystem
 
         private Type CreateTypeKey(string typeName)
         {
-            //Creating dummy types to use as keys for submenu instances when registering the submenus to keys in KitchenLib CreateSubmenusEvent
+            //Creating dummy types to use as keys for submenu instances when registering the submenus to keys in CreateSubmenusEvent
             TypeBuilder typeBuilder = _moduleBuilder.DefineType(typeName, TypeAttributes.Public);
             Type type = typeBuilder.CreateType();
             return type;
@@ -657,14 +656,14 @@ namespace PreferenceSystem
         {
             PopulateDefaults();
 
-            _kLPrefManager.SetProfile(GlobalPreferences.GetProfile(MOD_GUID));
+            _prefManager.SetProfile(GlobalPreferences.GetProfile(MOD_GUID));
             Load();
             _tempMainMenuTypeKeys.Push(_mainTopLevelTypeKey);
             _tempPauseMenuTypeKeys.Push(_pauseTopLevelTypeKey);
 
-            if (!_isKLPreferencesEventsRegistered)
+            if (!_isPreferencesEventsRegistered)
             {
-                _isKLPreferencesEventsRegistered = true;
+                _isPreferencesEventsRegistered = true;
                 while (_elements.Count > 0)
                 {
                     CompletedSubmenuTransfer();
@@ -683,7 +682,7 @@ namespace PreferenceSystem
                             confirmMenu = new ConfirmMenu<MainMenuAction>(args.Container, args.Module_list);
                             args.Menus.Add(typeof(ConfirmMenu<MainMenuAction>), confirmMenu);
                         }
-                        Submenu<MainMenuAction> submenu = new Submenu<MainMenuAction>(args.Container, args.Module_list, MOD_GUID, _kLPrefManager, submenuElements, (ConfirmMenu<MainMenuAction>)confirmMenu);
+                        Submenu<MainMenuAction> submenu = new Submenu<MainMenuAction>(args.Container, args.Module_list, MOD_GUID, _prefManager, submenuElements, (ConfirmMenu<MainMenuAction>)confirmMenu);
                         args.Menus.Add(mainMenuKey, submenu);
                     };
 
@@ -694,7 +693,7 @@ namespace PreferenceSystem
                             confirmMenu = new ConfirmMenu<PauseMenuAction>(args.Container, args.Module_list);
                             args.Menus.Add(typeof(ConfirmMenu<PauseMenuAction>), confirmMenu);
                         }
-                        Submenu<PauseMenuAction> submenu = new Submenu<PauseMenuAction>(args.Container, args.Module_list, MOD_GUID, _kLPrefManager, submenuElements, (ConfirmMenu<PauseMenuAction>)confirmMenu);
+                        Submenu<PauseMenuAction> submenu = new Submenu<PauseMenuAction>(args.Container, args.Module_list, MOD_GUID, _prefManager, submenuElements, (ConfirmMenu<PauseMenuAction>)confirmMenu);
                         args.Menus.Add(pauseMenuKey, submenu);
                     };
                 }
@@ -702,27 +701,27 @@ namespace PreferenceSystem
 
             if (menuType == MenuType.MainMenu && !_mainMenuRegistered)
             {
-                ModsPreferencesMenu<MainMenuAction>.RegisterMenu(MOD_NAME, _mainTopLevelTypeKey, typeof(MainMenuAction));
+                PreferenceSystemMenu<MainMenuAction>.RegisterMenu(MOD_NAME, _mainTopLevelTypeKey, typeof(MainMenuAction));
                 _mainMenuRegistered = true;
             }
             else if (menuType == MenuType.PauseMenu && !_pauseMenuRegistered)
             {
-                ModsPreferencesMenu<PauseMenuAction>.RegisterMenu(MOD_NAME, _pauseTopLevelTypeKey, typeof(PauseMenuAction));
+                PreferenceSystemMenu<PauseMenuAction>.RegisterMenu(MOD_NAME, _pauseTopLevelTypeKey, typeof(PauseMenuAction));
                 _pauseMenuRegistered = true;
             }
         }
 
-        private class Submenu<T> : KLMenu<T>
+        private class Submenu<T> : BaseMenu<T>
         {
             private readonly string _modGUID;
-            private readonly PreferenceManager _kLPrefManager;
+            private readonly PreferenceManager _prefManager;
             private readonly List<(ElementType, object)> _elements;
             private readonly ConfirmMenu<T> _confirmMenu;
 
             public Submenu(Transform container, ModuleList module_list, string ModGUID, PreferenceManager preferenceManager, List<(ElementType, object)> elements, ConfirmMenu<T> confirmMenu) : base(container, module_list)
             {
                 _modGUID = ModGUID;
-                _kLPrefManager = preferenceManager;
+                _prefManager = preferenceManager;
                 _elements = elements;
                 _confirmMenu = confirmMenu;
             }
@@ -779,7 +778,7 @@ namespace PreferenceSystem
                             break;
                         case ElementType.BoolOption:
                             OptionData<bool> boolOptionData = (OptionData<bool>)element.Item2;
-                            Option<bool> boolOption = new Option<bool>(boolOptionData.Values, _kLPrefManager.GetPreference<PreferenceBool>(boolOptionData.Key).Value, boolOptionData.Strings);
+                            Option<bool> boolOption = new Option<bool>(boolOptionData.Values, _prefManager.GetPreference<PreferenceBool>(boolOptionData.Key).Value, boolOptionData.Strings);
                             menuElement = AddSelect(boolOption);
                             boolOption.OnChanged += boolOptionData.EventHandler;
                             if (boolOptionData.Redraw)
@@ -792,7 +791,7 @@ namespace PreferenceSystem
                             break;
                         case ElementType.IntOption:
                             OptionData<int> intOptionData = (OptionData<int>)element.Item2;
-                            Option<int> intOption = new Option<int>(intOptionData.Values, _kLPrefManager.GetPreference<PreferenceInt>(intOptionData.Key).Value, intOptionData.Strings);
+                            Option<int> intOption = new Option<int>(intOptionData.Values, _prefManager.GetPreference<PreferenceInt>(intOptionData.Key).Value, intOptionData.Strings);
                             menuElement = AddSelect(intOption);
                             intOption.OnChanged += intOptionData.EventHandler;
                             if (intOptionData.Redraw)
@@ -805,7 +804,7 @@ namespace PreferenceSystem
                             break;
                         case ElementType.FloatOption:
                             OptionData<float> floatOptionData = (OptionData<float>)element.Item2;
-                            Option<float> floatOption = new Option<float>(floatOptionData.Values, _kLPrefManager.GetPreference<PreferenceFloat>(floatOptionData.Key).Value, floatOptionData.Strings);
+                            Option<float> floatOption = new Option<float>(floatOptionData.Values, _prefManager.GetPreference<PreferenceFloat>(floatOptionData.Key).Value, floatOptionData.Strings);
                             menuElement = AddSelect(floatOption);
                             floatOption.OnChanged += floatOptionData.EventHandler;
                             if (floatOptionData.Redraw)
@@ -818,7 +817,7 @@ namespace PreferenceSystem
                             break;
                         case ElementType.StringOption:
                             OptionData<string> stringOptionData = (OptionData<string>)element.Item2;
-                            Option<string> stringOption = new Option<string>(stringOptionData.Values, _kLPrefManager.GetPreference<PreferenceString>(stringOptionData.Key).Value, stringOptionData.Strings);
+                            Option<string> stringOption = new Option<string>(stringOptionData.Values, _prefManager.GetPreference<PreferenceString>(stringOptionData.Key).Value, stringOptionData.Strings);
                             menuElement = AddSelect(stringOption);
                             stringOption.OnChanged += stringOptionData.EventHandler;
                             if (stringOptionData.Redraw)
@@ -833,11 +832,11 @@ namespace PreferenceSystem
                             AddProfileSelector(_modGUID, delegate (string s)
                             {
                                 Redraw(player_id, i);
-                            }, _kLPrefManager, true);
+                            }, _prefManager, true);
                             break;
                         case ElementType.DeleteProfileButton:
                             DeleteProfileButtonData deleteProfileButtonData = (DeleteProfileButtonData)element.Item2;
-                            AddDeleteProfileButton(deleteProfileButtonData.ButtonText, _kLPrefManager, deleteProfileButtonData.Arg, deleteProfileButtonData.Scale, deleteProfileButtonData.Padding);
+                            AddDeleteProfileButton(deleteProfileButtonData.ButtonText, _prefManager, deleteProfileButtonData.Arg, deleteProfileButtonData.Scale, deleteProfileButtonData.Padding);
                             break;
                         case ElementType.Spacer:
                             New<SpacerElement>();
@@ -911,7 +910,7 @@ namespace PreferenceSystem
             }
         }
 
-        public class ConfirmMenu<T> : KLMenu<T>
+        public class ConfirmMenu<T> : BaseMenu<T>
         {
             private string _infoText = String.Empty;
             private Action<GenericChoiceDecision> _callback = null;

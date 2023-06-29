@@ -1,8 +1,8 @@
 ﻿using HarmonyLib;
 using Kitchen;
 using Kitchen.Modules;
-using KitchenLib;
-using KitchenLib.Utils;
+using PreferenceSystem.Menus;
+using PreferenceSystem.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -28,6 +28,7 @@ namespace PreferenceSystem.Patches
         [HarmonyPostfix]
         static void Setup_Postfix(ModsPreferencesMenu<PauseMenuAction> __instance)
         {
+            string prefSetName = PreferenceSystemRegistry.LastLoadedPreferenceSetName;
             if (!PreferenceSystemRegistry.LastLoadedPreferenceSetName.IsNullOrEmpty())
             {
                 if (_methodInfos == null)

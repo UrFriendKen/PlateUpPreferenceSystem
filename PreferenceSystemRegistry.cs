@@ -1,11 +1,11 @@
-﻿using KitchenLib.Utils;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
+using PreferenceSystem.Utils;
 
 namespace PreferenceSystem
 {
