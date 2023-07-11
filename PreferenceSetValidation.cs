@@ -7,7 +7,7 @@ namespace PreferenceSystem
 {
     public class PreferenceSetValidation : GenericSystemBase, IModSystem
     {
-        public const float CHECK_INTERVAL = 20f;
+        //public const float CHECK_INTERVAL = 20f;
 
         public struct SPreferenceSetCheck : IComponentData, IModComponent
         {
@@ -19,20 +19,20 @@ namespace PreferenceSystem
 
         protected override void Initialise()
         {
-            base.Initialise();
+            //base.Initialise();
         }
 
         protected override void OnUpdate()
         {
-            SPreferenceSetCheck checker = GetOrCreate<SPreferenceSetCheck>();
+            //SPreferenceSetCheck checker = GetOrCreate<SPreferenceSetCheck>();
 
-            checker.DelayProgress -= Time.RealDeltaTime;
-            if (checker.DelayProgress < 0f)
-            {
-                checker.IsDirty = PreferenceSystemRegistry.IsPreferencesTampered;
-                checker.DelayProgress = CHECK_INTERVAL;
-            }
-            Set(checker);
+            //checker.DelayProgress -= Time.RealDeltaTime;
+            //if (checker.DelayProgress < 0f)
+            //{
+            //    checker.IsDirty = PreferenceSystemRegistry.IsPreferencesTampered;
+            //    checker.DelayProgress = CHECK_INTERVAL;
+            //}
+            //Set(checker);
         }
     }
 }

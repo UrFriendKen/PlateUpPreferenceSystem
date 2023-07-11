@@ -30,7 +30,6 @@ namespace PreferenceSystem.Patches
         [HarmonyPrefix]
         private static bool Prefix(StartMainMenu __instance)
         {
-            Main.LogError($"Instance Type: {__instance.GetType()}");
             ProfileManager.Main.Load();
             MethodInfo addActionButton = __instance.GetType().GetMethods(BindingFlags.Instance | BindingFlags.NonPublic).Single((m) => m.Name == "AddActionButton" && m.GetParameters().Length == 3);
             MethodInfo method = ReflectionUtils.GetMethod<StartMainMenu>("AddSubmenuButton");

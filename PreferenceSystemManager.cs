@@ -733,7 +733,6 @@ namespace PreferenceSystem
 
             private void Redraw(int player_id, int selectElementIndex = -1)
             {
-                Main.LogWarning(selectElementIndex);
                 ModuleList.Clear();
                 for (int i = 0; i < _elements.Count; i++)
                 {

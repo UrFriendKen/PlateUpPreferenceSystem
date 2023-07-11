@@ -14,6 +14,8 @@ namespace PreferenceSystem.Menus
 
         private static Dictionary<(Type, Type), string> RegisteredMenus = new Dictionary<(Type, Type), string>();
         private static Dictionary<(Type, Type), int> MenuPages = new Dictionary<(Type, Type), int>();
+        private static Dictionary<(string, Type), Action<int>> RegisteredButtons = new Dictionary<(string, Type), Action<int>>();
+        private static Dictionary<(string, Type), int> ButtonPages = new Dictionary<(string, Type), int>();
 
         private static int MenusPerPage = 5;
 
@@ -63,19 +65,61 @@ namespace PreferenceSystem.Menus
                         break;
                     }
                 }
-
-                if (foundValidPage)
+                if (!Pages[generic].Contains(page))
                 {
-
-                    if (!Pages[generic].Contains(page))
-                    {
-                        Pages[generic].Add(page);
-                        PageNames[generic].Add("Page: " + page);
-                    }
-                    MenuPages.Add((type, generic), page);
+                    Pages[generic].Add(page);
+                    PageNames[generic].Add("Page: " + page);
                 }
+                MenuPages.Add((type, generic), page);
             }
         }
+
+        public static void RegisterButton(string name, Action<int> on_activate, Type generic)
+        {
+            if (!RegisteredButtons.ContainsKey((name, generic)))
+            {
+                if (!Pages.ContainsKey(generic))
+                    Pages.Add(generic, new List<int>());
+                if (!PageNames.ContainsKey(generic))
+                    PageNames.Add(generic, new List<string>());
+
+                RegisteredButtons.Add((name, generic), on_activate);
+
+                bool foundValidPage = false;
+                int page = 0;
+                while (!foundValidPage)
+                {
+                    if (MenuPageCounter.ContainsKey((generic, page)))
+                    {
+                        int pageCount = MenuPageCounter[(generic, page)];
+                        if (pageCount < MenusPerPage)
+                        {
+                            MenuPageCounter[(generic, page)]++;
+                            foundValidPage = true;
+                        }
+                        else
+                        {
+                            page++;
+                        }
+                    }
+                    else
+                    {
+                        MenuPageCounter.Add((generic, page), 0);
+                        MenuPageCounter[(generic, page)]++;
+                        foundValidPage = true;
+                        break;
+                    }
+                }
+                if (!Pages[generic].Contains(page))
+                {
+                    Pages[generic].Add(page);
+                    PageNames[generic].Add("Page: " + page);
+                }
+                ButtonPages.Add((name, generic), page);
+            }
+        }
+
+
 
         public override void Setup(int player_id)
         {
@@ -116,6 +160,17 @@ namespace PreferenceSystem.Menus
                     if (MenuPages[menu] == pageNumber)
                     {
                         AddSubmenuButton(RegisteredMenus[menu], menu.Item1, false);
+                    }
+                }
+            }
+
+            foreach ((string, Type) menu in RegisteredButtons.Keys)
+            {
+                if (menu.Item2 == this.GetType().GetGenericArguments()[0])
+                {
+                    if (ButtonPages[menu] == pageNumber)
+                    {
+                        AddButton(menu.Item1, RegisteredButtons[menu]);
                     }
                 }
             }

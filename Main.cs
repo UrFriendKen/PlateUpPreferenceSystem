@@ -1,13 +1,12 @@
-﻿using PreferenceSystem.Event;
-using KitchenMods;
-using System;
-using System.IO;
-using UnityEngine;
-using PreferenceSystem.Menus;
+﻿using HarmonyLib;
 using Kitchen;
-using HarmonyLib;
+using KitchenMods;
+using PreferenceSystem.Event;
+using PreferenceSystem.Menus;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
+using UnityEngine;
 
 namespace PreferenceSystem
 {
@@ -15,14 +14,17 @@ namespace PreferenceSystem
     {
         public const string MOD_GUID = "IcedMilo.PlateUp.PreferenceSystem";
         public const string MOD_NAME = "PreferenceSystem";
-        public const string MOD_VERSION = "1.0.0";
+        public const string MOD_VERSION = "1.0.3";
+
+        internal static PreferenceSystemManager PrefManager;
 
         private Harmony _harmonyInstance;
         private static List<Assembly> PatchedAssemblies = new List<Assembly>();
 
-        PreferenceSystemManager _prefManager;
-
         internal const string PREFERENCE_SYSTEM_BUTTON_LOCATION_ID = "preferenceSystemButtonLocation";
+        internal const string CONSOLIDATE_MODDED_ROOT_BUTTONS_ID = "consolidateModdedRootButtons";
+
+        internal const string CONSOLIDATION_WARNING_TEXT = "Some buttons moved to Options => PreferenceSystem";
 
         public Main()
         {
@@ -46,29 +48,42 @@ namespace PreferenceSystem
                 Directory.CreateDirectory($"{PreferenceSystemRegistry.PREFERENCE_SETS_FOLDER_PATH}");
 
             SetupMenus();
+
+            PrefManager = new PreferenceSystemManager(MOD_GUID, $"{MOD_NAME} Settings");
+            PrefManager
+                .AddLabel("Modded Root Buttons")
+                .AddInfo("Consolidating moves all modded buttons into PreferenceSystem menu.")
+                .AddOption<bool>(
+                    CONSOLIDATE_MODDED_ROOT_BUTTONS_ID,
+                    false,
+                    new bool[] { false, true },
+                    new string[] { "Ignore", "Consolidate" })
+                .AddSpacer()
+                .AddSpacer();
+
+            PrefManager.RegisterMenu(PreferenceSystemManager.MenuType.PauseMenu);
         }
 
         private void SetupMenus()
         {
-            Events.StartOptionsMenu_SetupEvent = (EventHandler<StartMainMenu_SetupArgs>)Delegate.Combine(Events.StartOptionsMenu_SetupEvent, (EventHandler<StartMainMenu_SetupArgs>)delegate (object s, StartMainMenu_SetupArgs args)
+            Events.StartOptionsMenu_SetupEvent = delegate (object s, StartMainMenu_SetupArgs args)
             {
-                LogError("StartOptionsMenu invoke");
                 args.addSubmenuButton.Invoke(args.instance, new object[3]
                 {
                     "PreferenceSystem",
                     typeof(PreferenceSystemMenu<MainMenuAction>),
                     false
                 });
-            });
-            Events.MainMenuView_SetupMenusEvent = (EventHandler<MainMenuView_SetupMenusArgs>)Delegate.Combine(Events.MainMenuView_SetupMenusEvent, (EventHandler<MainMenuView_SetupMenusArgs>)delegate (object s, MainMenuView_SetupMenusArgs args)
+            };
+            Events.MainMenuView_SetupMenusEvent = delegate (object s, MainMenuView_SetupMenusArgs args)
             {
                 args.addMenu.Invoke(args.instance, new object[2]
                 {
                     typeof(PreferenceSystemMenu<MainMenuAction>),
                     new PreferenceSystemMenu<MainMenuAction>(args.instance.ButtonContainer, args.module_list)
                 });
-            });
-            Events.OptionsMenu_SetupEvent = (EventHandler<MainMenu_SetupArgs>)Delegate.Combine(Events.OptionsMenu_SetupEvent, (EventHandler<MainMenu_SetupArgs>)delegate (object s, MainMenu_SetupArgs args)
+            };
+            Events.OptionsMenu_SetupEvent = delegate (object s, MainMenu_SetupArgs args)
             {
                 args.addSubmenuButton.Invoke(args.instance, new object[3]
                 {
@@ -76,15 +91,15 @@ namespace PreferenceSystem
                     typeof(PreferenceSystemMenu<PauseMenuAction>),
                     false
                 });
-            });
-            Events.PlayerPauseView_SetupMenusEvent = (EventHandler<PlayerPauseView_SetupMenusArgs>)Delegate.Combine(Events.PlayerPauseView_SetupMenusEvent, (EventHandler<PlayerPauseView_SetupMenusArgs>)delegate (object s, PlayerPauseView_SetupMenusArgs args)
+            };
+            Events.PlayerPauseView_SetupMenusEvent += delegate (object s, PlayerPauseView_SetupMenusArgs args)
             {
                 args.addMenu.Invoke(args.instance, new object[2]
                 {
                     typeof(PreferenceSystemMenu<PauseMenuAction>),
                     new PreferenceSystemMenu<PauseMenuAction>(args.instance.ButtonContainer, args.module_list)
                 });
-            });
+            };
         }
 
         public void PreInject()
