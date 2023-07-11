@@ -25,6 +25,8 @@ namespace PreferenceSystem.Patches
             "Save and Return to HQ",
             "Continue",
             "Quit Game",
+
+            "Restart Day",
             Main.CONSOLIDATION_WARNING_TEXT
         };
 
