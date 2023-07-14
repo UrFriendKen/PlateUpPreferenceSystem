@@ -11,6 +11,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Text.RegularExpressions;
 using UnityEngine;
+using static PreferenceSystem.Utils.TypeUtils;
 
 namespace PreferenceSystem
 {
@@ -20,24 +21,6 @@ namespace PreferenceSystem
         {
             MainMenu,
             PauseMenu
-        }
-
-        public enum MenuAction
-        {
-            MainMenuNull,
-            MainMenuStartSingleplayer,
-            MainMenuQuit,
-            MainMenuStartMultiplayer,
-            MainMenuBack,
-
-            PauseMenuCloseMenu,
-            PauseMenuBack,
-            PauseMenuDisconnectPlayer,
-            PauseMenuQuit,
-            PauseMenuAbandonRestaurant,
-            PauseMenuOpenInvitePanel,
-            PauseMenuLeaveGame,
-            PauseMenuPracticeMode
         }
 
         public readonly string MOD_GUID;
@@ -86,6 +69,8 @@ namespace PreferenceSystem
         private Stack<Type> _tempMainMenuTypeKeys = new Stack<Type>();
         private Stack<Type> _tempPauseMenuTypeKeys = new Stack<Type>();
         private Stack<List<(ElementType, object)>> _elements = new Stack<List<(ElementType, object)>>();
+        private Stack<int> _conditionalBlockers = new Stack<int>();
+
         internal enum ElementType
         {
             Label,
@@ -101,9 +86,17 @@ namespace PreferenceSystem
             IntOption,
             FloatOption,
             StringOption,
-            Spacer
+            Spacer,
+            ConditionalBlocker,
+            ConditionalBlockerDone,
+            ActionButton
         }
 
+        /// <summary>
+        /// Create PreferenceSystemManager instance.
+        /// </summary>
+        /// <param name="modGUID">Unique mod identifier</param>
+        /// <param name="modName">Name displayed on mod menu button</param>
         public PreferenceSystemManager(string modGUID, string modName)
         {
             MOD_GUID = modGUID;
@@ -116,6 +109,7 @@ namespace PreferenceSystem
             _mainTopLevelTypeKey = CreateTypeKey($"{sWhitespace.Replace(MOD_NAME, "")}_Main");
             _pauseTopLevelTypeKey = CreateTypeKey($"{sWhitespace.Replace(MOD_NAME, "")}_Pause");
             _elements.Push(new List<(ElementType, object)>());
+            _conditionalBlockers.Push(0);
 
             _completedElements = new Queue<List<(ElementType, object)>>();
 
@@ -160,31 +154,79 @@ namespace PreferenceSystem
             throw new ArgumentException($"Key {key} already exists!");
         }
 
-        private T ChangeType<T>(object obj)
-        {
-            return (T)Convert.ChangeType(obj, typeof(T));
-        }
-
         private void Preference_OnChanged<T>(string key, T value)
         {
             Set(key, value);
         }
 
+        /// <summary>
+        /// Create selector with a linked preference
+        /// </summary>
+        /// <typeparam name="T">Type of preference value</typeparam>
+        /// <param name="key">Unique preference identifier</param>
+        /// <param name="initialValue">Starting value when preference is created for the first time</param>
+        /// <param name="values">Array of allowed values</param>
+        /// <param name="strings">Array of string representations for each value</param>
+        /// <returns>Instance of PreferenceSystemManager (for method chaining)</returns>
         public PreferenceSystemManager AddOption<T>(string key, T initialValue, T[] values, string[] strings)
         {
             return PrivateAddOption<T>(key, initialValue, values, strings, false, null);
         }
 
+        /// <summary>
+        /// Create selector with a linked preference
+        /// </summary>
+        /// <typeparam name="T">Type of preference value</typeparam>
+        /// <param name="key">Unique identifier</param>
+        /// <param name="initialValue">Starting value when preference is created for the first time</param>
+        /// <param name="values">Array of allowed values</param>
+        /// <param name="strings">Array of string representations for each value</param>
+        /// <param name="on_changed">Callback when selector value is changed</param>
+        /// <returns>Instance of PreferenceSystemManager (for method chaining)</returns>
         public PreferenceSystemManager AddOption<T>(string key, T initialValue, T[] values, string[] strings, Action<T> on_changed)
         {
             return PrivateAddOption<T>(key, initialValue, values, strings, false, on_changed);
         }
 
+        /// <summary>
+        /// Create selector with a linked preference
+        /// </summary>
+        /// <typeparam name="T">Type of preference value</typeparam>
+        /// <param name="key">Unique preference identifier</param>
+        /// <param name="initialValue">Starting value when preference is created for the first time</param>
+        /// <param name="values">Array of allowed values</param>
+        /// <param name="strings">Array of string representations for each value</param>
+        /// <param name="redraw">Redraw menu when selector value is changed</param>
+        /// <returns>Instance of PreferenceSystemManager (for method chaining)</returns>
+        public PreferenceSystemManager AddOption<T>(string key, T initialValue, T[] values, string[] strings, bool redraw)
+        {
+            return PrivateAddOption<T>(key, initialValue, values, strings, false, null, redraw);
+        }
+
+        /// <summary>
+        /// Create selector with a linked preference
+        /// </summary>
+        /// <typeparam name="T">Type of preference value</typeparam>
+        /// <param name="key">Unique preference identifier</param>
+        /// <param name="initialValue">Starting value when preference is created for the first time</param>
+        /// <param name="values">Array of allowed values</param>
+        /// <param name="strings">Array of string representations for each value</param>
+        /// <param name="on_changed">Callback when selector value is changed</param>
+        /// <param name="redraw">Redraw menu when selector value is changed</param>
+        /// <returns>Instance of PreferenceSystemManager (for method chaining)</returns>
         public PreferenceSystemManager AddOption<T>(string key, T initialValue, T[] values, string[] strings, Action<T> on_changed, bool redraw)
         {
             return PrivateAddOption<T>(key, initialValue, values, strings, false, on_changed, redraw);
         }
 
+        /// <summary>
+        /// Create hidden preference which is not displayed in menu
+        /// </summary>
+        /// <typeparam name="T">Type of preference value</typeparam>
+        /// <param name="key">Unique preference identifier</param>
+        /// <param name="initialValue">Starting value when preference is created for the first time</param>
+        /// <param name="doLoad">Set true if called after RegisterMenu. Otherwise, false.</param>>
+        /// <returns>Instance of PreferenceSystemManager (for method chaining)</returns>
         public PreferenceSystemManager AddProperty<T>(string key, T initialValue, bool doLoad = false)
         {
             PrivateAddOption<T>(key, initialValue, null, null, true, null);
@@ -263,6 +305,12 @@ namespace PreferenceSystem
             return this;
         }
 
+        /// <summary>
+        /// Retrieve preference value
+        /// </summary>
+        /// <typeparam name="T">Type of preference value.</typeparam>
+        /// <param name="key">Unique preference identifier</param>
+        /// <returns>Value of preference. If preference does not exist, default is returned instead.</returns>
         public T Get<T>(string key)
         {
             return (T)(Get(key, typeof(T)) ?? default(T));
@@ -292,12 +340,18 @@ namespace PreferenceSystem
             return value;
         }
 
+        /// <summary>
+        /// Set preference value
+        /// </summary>
+        /// <typeparam name="T">Type of preference value.</typeparam>
+        /// <param name="key">Unique preference identifier</param>
+        /// <param name="value">Value to be applied</param>
         public void Set<T>(string key, T value)
         {
             Set(key, typeof(T), value);
         }
 
-        public void Set(string key, Type valueType , object value)
+        private void Set(string key, Type valueType , object value)
         {
             IsAllowedType(valueType, true);
 
@@ -320,6 +374,10 @@ namespace PreferenceSystem
             Save();
         }
 
+        /// <summary>
+        /// Change current preference profile and loads preference values. If profile name does not exist, a new preference profile is created.
+        /// </summary>
+        /// <param name="profileName">Profile name</param>
         public void SetProfile(string profileName)
         {
             if (!GlobalPreferences.DoesProfileExist(MOD_GUID, profileName))
@@ -330,6 +388,21 @@ namespace PreferenceSystem
             _prefManager.SetProfile(profileName);
             _prefManager.Load();
             _prefManager.Save();
+        }
+
+        /// <summary>
+        /// Try to change current preference profile and loads preference values, if profile exists.
+        /// </summary>
+        /// <param name="profileName">Profile name</param>
+        /// <returns>True if profile was changed. Otherwise, false</returns>
+        public bool TrySetProfile(string profileName)
+        {
+            if (!GlobalPreferences.DoesProfileExist(MOD_GUID, profileName))
+            {
+                return false;
+            }
+            SetProfile(profileName);
+            return true;
         }
 
         private void Save()
@@ -488,14 +561,27 @@ namespace PreferenceSystem
         }
         private readonly struct ActionButtonData
         {
+            public readonly Type MenuType;
             public readonly string ButtonText;
-            public readonly MenuAction Action;
-            public readonly ElementStyle Style;
-            public ActionButtonData(string button_text, MenuAction action, ElementStyle style = ElementStyle.Default)
+            private readonly PauseMenuAction PauseAction;
+            private readonly MainMenuAction MainAction;
+            public object Action => (MenuType == typeof(MainMenuAction)) ? MainAction : ((MenuType == typeof(PauseMenuAction)) ? PauseAction : null);
+            public ActionButtonData(string button_text, object action)
             {
                 ButtonText = button_text;
-                Action = action;
-                Style = style;
+                MenuType = action.GetType();
+                if (action is MainMenuAction mainMenuAction)
+                {
+                    MainAction = mainMenuAction;
+                }
+                else if (action is PauseMenuAction pauseMenuAction)
+                {
+                    PauseAction = pauseMenuAction;
+                }
+                else
+                {
+                    throw new Exception("ActionButton action type must be a MainMenuAction or PauseMenuAction!");
+                }
             }
         }
         private readonly struct OptionData<T>
@@ -529,6 +615,14 @@ namespace PreferenceSystem
                 Arg = arg;
                 Scale = scale;
                 Padding = padding;
+            }
+        }
+        private readonly struct ConditionalBlockerData
+        {
+            public readonly Func<bool> ShouldBlock;
+            public ConditionalBlockerData(Func<bool> shouldBlock)
+            {
+                ShouldBlock = shouldBlock;
             }
         }
 
@@ -580,6 +674,7 @@ namespace PreferenceSystem
             _tempPauseMenuTypeKeys.Push(pauseTypeKey);
             _elements.Peek().Add((ElementType.SubmenuButton, new SubmenuButtonData(button_text, mainTypeKey, pauseTypeKey, skip_stack)));
             _elements.Push(new List<(ElementType, object)>());
+            _conditionalBlockers.Push(0);
             return this;
         }
 
@@ -591,9 +686,14 @@ namespace PreferenceSystem
             return this;
         }
 
-        public PreferenceSystemManager AddActionButton(string button_text, MenuAction action, ElementStyle style = ElementStyle.Default)
+        public PreferenceSystemManager AddActionButton(string button_text, PauseMenuAction action)
         {
-            _elements.Peek().Add((ElementType.Button, new ActionButtonData(button_text, action, style)));
+            _elements.Peek().Add((ElementType.ActionButton, new ActionButtonData(button_text, action)));
+            return this;
+        }
+        public PreferenceSystemManager AddActionButton(string button_text, MainMenuAction action)
+        {
+            _elements.Peek().Add((ElementType.ActionButton, new ActionButtonData(button_text, action)));
             return this;
         }
 
@@ -625,6 +725,23 @@ namespace PreferenceSystem
             return this;
         }
 
+        public PreferenceSystemManager AddConditionalBlocker(Func<bool> shouldBlock)
+        {
+            _elements.Peek().Add((ElementType.ConditionalBlocker, new ConditionalBlockerData(shouldBlock)));
+            _conditionalBlockers.Push(_conditionalBlockers.Pop() + 1);
+            return this;
+        }
+
+        public PreferenceSystemManager ConditionalBlockerDone()
+        {
+            if (_conditionalBlockers.Peek() < 1)
+            {
+                throw new Exception("No conditional blockers to terminate.");
+            }
+            _elements.Peek().Add((ElementType.ConditionalBlockerDone, null));
+            return this;
+        }
+
         private Type CreateTypeKey(string typeName)
         {
             //Creating dummy types to use as keys for submenu instances when registering the submenus to keys in CreateSubmenusEvent
@@ -636,6 +753,7 @@ namespace PreferenceSystem
         private void CompletedSubmenuTransfer()
         {
             _completedElements.Enqueue(_elements.Pop());
+            _conditionalBlockers.Pop();
             _mainMenuTypeKeys.Enqueue(_tempMainMenuTypeKeys.Pop());
             _pauseMenuTypeKeys.Enqueue(_tempPauseMenuTypeKeys.Pop());
         }
@@ -717,6 +835,7 @@ namespace PreferenceSystem
             private readonly PreferenceManager _prefManager;
             private readonly List<(ElementType, object)> _elements;
             private readonly ConfirmMenu<T> _confirmMenu;
+            private List<bool> _isBlocking;
 
             public Submenu(Transform container, ModuleList module_list, string ModGUID, PreferenceManager preferenceManager, List<(ElementType, object)> elements, ConfirmMenu<T> confirmMenu) : base(container, module_list)
             {
@@ -724,6 +843,7 @@ namespace PreferenceSystem
                 _prefManager = preferenceManager;
                 _elements = elements;
                 _confirmMenu = confirmMenu;
+                _isBlocking = new List<bool>();
             }
 
             public override void Setup(int player_id)
@@ -734,21 +854,39 @@ namespace PreferenceSystem
             private void Redraw(int player_id, int selectElementIndex = -1)
             {
                 ModuleList.Clear();
+                _isBlocking.Clear();
                 for (int i = 0; i < _elements.Count; i++)
                 {
                     int elementIndex = i;
-                    var element = _elements[i];
+                    (ElementType type, object data) element = _elements[i];
+
+                    switch (element.type)
+                    {
+                        case ElementType.ConditionalBlocker:
+                            ConditionalBlockerData conditionalBlockerData = (ConditionalBlockerData)element.data;
+                            _isBlocking.Add(conditionalBlockerData.ShouldBlock());
+                            break;
+                        case ElementType.ConditionalBlockerDone:
+                            if (_isBlocking.Count > 0)
+                                _isBlocking.RemoveAt(_isBlocking.Count - 1);
+                            break;
+                        default:
+                            if (_isBlocking.Count > 0 && _isBlocking.Where(block => block).Any())
+                                continue;
+                            break;
+                    }
+
                     Element menuElement = null;
-                    switch (element.Item1)
+                    switch (element.type)
                     {
                         case ElementType.Label:
-                            AddLabel(((LabelData)element.Item2).Text);
+                            AddLabel(((LabelData)element.data).Text);
                             break;
                         case ElementType.Info:
-                            AddInfo(((InfoData)element.Item2).Text);
+                            AddInfo(((InfoData)element.data).Text);
                             break;
                         case ElementType.Select:
-                            SelectData selectData = (SelectData)element.Item2;
+                            SelectData selectData = (SelectData)element.data;
                             menuElement = AddSelect(selectData.Options, delegate(int selectDataIndex)
                             {
                                 selectData.OnActivate(selectDataIndex);
@@ -759,24 +897,31 @@ namespace PreferenceSystem
                             }, selectData.Index);
                             break;
                         case ElementType.Button:
-                            ButtonData buttonData = (ButtonData)element.Item2;
+                            ButtonData buttonData = (ButtonData)element.data;
                             AddButton(buttonData.ButtonText, buttonData.OnActivate, buttonData.Arg, buttonData.Scale, buttonData.Padding);
                             break;
+                        case ElementType.ActionButton:
+                            ActionButtonData actionButtonData = (ActionButtonData)element.data;
+                            if (actionButtonData.MenuType == typeof(T))
+                            {
+                                AddActionButton(actionButtonData.ButtonText, ChangeType<T>(actionButtonData.Action));
+                            }
+                            break;
                         case ElementType.ButtonWithConfirm:
-                            ButtonWithConfirmData buttonWithConfirmData = (ButtonWithConfirmData)element.Item2;
+                            ButtonWithConfirmData buttonWithConfirmData = (ButtonWithConfirmData)element.data;
                             AddButtonWithConfirm(buttonWithConfirmData.ButtonText, buttonWithConfirmData.InfoText, buttonWithConfirmData.Callback, buttonWithConfirmData.Arg, buttonWithConfirmData.Scale, buttonWithConfirmData.Padding);
                             break;
                         case ElementType.PlayerRow:
-                            PlayerRowData playerRowData = (PlayerRowData)element.Item2;
+                            PlayerRowData playerRowData = (PlayerRowData)element.data;
                             AddPlayerRow(playerRowData.Username, playerRowData.Player, playerRowData.OnKick, playerRowData.OnRemove, playerRowData.Arg, playerRowData.Scale, playerRowData.Padding);
                             break;
                         case ElementType.SubmenuButton:
-                            SubmenuButtonData submenuButtonData = (SubmenuButtonData)element.Item2;
+                            SubmenuButtonData submenuButtonData = (SubmenuButtonData)element.data;
                             Type submenuKey = typeof(T) == typeof(MainMenuAction) ? submenuButtonData.MainMenuKey : submenuButtonData.PauseMenuKey;
                             AddSubmenuButton(submenuButtonData.ButtonText, submenuKey, submenuButtonData.SkipStack);
                             break;
                         case ElementType.BoolOption:
-                            OptionData<bool> boolOptionData = (OptionData<bool>)element.Item2;
+                            OptionData<bool> boolOptionData = (OptionData<bool>)element.data;
                             Option<bool> boolOption = new Option<bool>(boolOptionData.Values, _prefManager.GetPreference<PreferenceBool>(boolOptionData.Key).Value, boolOptionData.Strings);
                             menuElement = AddSelect(boolOption);
                             boolOption.OnChanged += boolOptionData.EventHandler;
@@ -789,7 +934,7 @@ namespace PreferenceSystem
                             }
                             break;
                         case ElementType.IntOption:
-                            OptionData<int> intOptionData = (OptionData<int>)element.Item2;
+                            OptionData<int> intOptionData = (OptionData<int>)element.data;
                             Option<int> intOption = new Option<int>(intOptionData.Values, _prefManager.GetPreference<PreferenceInt>(intOptionData.Key).Value, intOptionData.Strings);
                             menuElement = AddSelect(intOption);
                             intOption.OnChanged += intOptionData.EventHandler;
@@ -802,7 +947,7 @@ namespace PreferenceSystem
                             }
                             break;
                         case ElementType.FloatOption:
-                            OptionData<float> floatOptionData = (OptionData<float>)element.Item2;
+                            OptionData<float> floatOptionData = (OptionData<float>)element.data;
                             Option<float> floatOption = new Option<float>(floatOptionData.Values, _prefManager.GetPreference<PreferenceFloat>(floatOptionData.Key).Value, floatOptionData.Strings);
                             menuElement = AddSelect(floatOption);
                             floatOption.OnChanged += floatOptionData.EventHandler;
@@ -815,7 +960,7 @@ namespace PreferenceSystem
                             }
                             break;
                         case ElementType.StringOption:
-                            OptionData<string> stringOptionData = (OptionData<string>)element.Item2;
+                            OptionData<string> stringOptionData = (OptionData<string>)element.data;
                             Option<string> stringOption = new Option<string>(stringOptionData.Values, _prefManager.GetPreference<PreferenceString>(stringOptionData.Key).Value, stringOptionData.Strings);
                             menuElement = AddSelect(stringOption);
                             stringOption.OnChanged += stringOptionData.EventHandler;
@@ -834,7 +979,7 @@ namespace PreferenceSystem
                             }, _prefManager, true);
                             break;
                         case ElementType.DeleteProfileButton:
-                            DeleteProfileButtonData deleteProfileButtonData = (DeleteProfileButtonData)element.Item2;
+                            DeleteProfileButtonData deleteProfileButtonData = (DeleteProfileButtonData)element.data;
                             AddDeleteProfileButton(deleteProfileButtonData.ButtonText, _prefManager, deleteProfileButtonData.Arg, deleteProfileButtonData.Scale, deleteProfileButtonData.Padding);
                             break;
                         case ElementType.Spacer:
@@ -848,12 +993,19 @@ namespace PreferenceSystem
                     {
                         ModuleList.Select(menuElement);
                     }
-
                 }
+
                 AddButton(base.Localisation["MENU_BACK_SETTINGS"], delegate
                 {
                     RequestPreviousMenu();
                 });
+
+                Container?.Find("Panel(Clone)")?.GetComponent<PanelElement>()?.SetTarget(ModuleList);
+                Transform playerPauseViewGO = Container?.parent?.parent?.parent;
+                if (playerPauseViewGO?.GetComponent<PlayerPauseView>() != null)
+                {
+                    playerPauseViewGO.localPosition = -ModuleList.BoundingBox.center;
+                }
             }
 
             protected ButtonElement AddButtonWithConfirm(string label, string infoText, Action<GenericChoiceDecision> callback, int arg = 0, float scale = 1f, float padding = 0.2f)

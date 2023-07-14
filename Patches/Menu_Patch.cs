@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using Kitchen;
+using KitchenData;
 using PreferenceSystem.Menus;
 using System;
 using System.Collections.Generic;
@@ -11,21 +12,22 @@ namespace PreferenceSystem.Patches
     {
         internal static Dictionary<string, (Type type, bool skipStack)> InterceptedRootButtons = new Dictionary<string, (Type type, bool skipStack)>();
 
-        static HashSet<string> _ignoredLabels = new HashSet<string>()
+        static HashSet<string> _ignoredLabels => new HashSet<string>()
         {
             "Mods",
             "Mod Preferences",
-            "Recipes",
-            "Active Cards",
-            "Practice Mode",
-            "Options",
-            "Remove Input",
-            "Multiplayer",
-            "Abandon",
-            "Save and Return to HQ",
-            "Continue",
-            "Quit Game",
-
+            GameData.Main.GlobalLocalisation["MENU_DISCONNECT"],
+            GameData.Main.GlobalLocalisation["MENU_LEAVE_TUTORIAL"],
+            GameData.Main.GlobalLocalisation["MENU_RECIPES"],
+            GameData.Main.GlobalLocalisation["MENU_ACTIVE_CARDS"],
+            GameData.Main.GlobalLocalisation["MENU_PRACTICE_MODE"],
+            GameData.Main.GlobalLocalisation["MENU_OPTIONS"],
+            GameData.Main.GlobalLocalisation["MENU_REMOVE_INPUT"],
+            GameData.Main.GlobalLocalisation["MENU_MULTIPLAYER"],
+            GameData.Main.GlobalLocalisation["MENU_ABANDON"],
+            GameData.Main.GlobalLocalisation["MENU_QUIT_TO_LOBBY"],
+            GameData.Main.GlobalLocalisation["MENU_CONTINUE"],
+            GameData.Main.GlobalLocalisation["MENU_QUIT"],
             "Restart Day",
             Main.CONSOLIDATION_WARNING_TEXT
         };
