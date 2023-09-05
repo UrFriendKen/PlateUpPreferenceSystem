@@ -28,6 +28,7 @@ namespace PreferenceSystem.Patches
             GameData.Main.GlobalLocalisation["MENU_QUIT_TO_LOBBY"],
             GameData.Main.GlobalLocalisation["MENU_CONTINUE"],
             GameData.Main.GlobalLocalisation["MENU_QUIT"],
+            "Rehearsal Time",
             "Restart Day",
             Main.CONSOLIDATION_WARNING_TEXT
         };
