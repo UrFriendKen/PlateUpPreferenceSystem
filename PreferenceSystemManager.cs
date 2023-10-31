@@ -89,7 +89,33 @@ namespace PreferenceSystem
             Spacer,
             ConditionalBlocker,
             ConditionalBlockerDone,
-            ActionButton
+            ActionButton,
+            PageSelector,
+            PagedItem,
+            PagedItemDone
+        }
+
+        internal bool IsSelectableElement(ElementType elementType)
+        {
+            switch (elementType)
+            {
+                case ElementType.Select:
+                case ElementType.Button:
+                case ElementType.ButtonWithConfirm:
+                case ElementType.PlayerRow:
+                case ElementType.SubmenuButton:
+                case ElementType.ProfileSelector:
+                case ElementType.DeleteProfileButton:
+                case ElementType.BoolOption:
+                case ElementType.IntOption:
+                case ElementType.FloatOption:
+                case ElementType.StringOption:
+                case ElementType.ActionButton:
+                case ElementType.PageSelector:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         /// <summary>
@@ -626,6 +652,16 @@ namespace PreferenceSystem
             }
         }
 
+        private readonly struct PageSelectorData
+        {
+            public readonly int MaxItemsPerPage;
+
+            public PageSelectorData(int maxItemsPerPage)
+            {
+                MaxItemsPerPage = maxItemsPerPage;
+            }
+        }
+
         public PreferenceSystemManager AddLabel(string text)
         {
             _elements.Peek().Add((ElementType.Label, new LabelData(text)));
@@ -738,7 +774,125 @@ namespace PreferenceSystem
             {
                 throw new Exception("No conditional blockers to terminate.");
             }
+            int conditionalBlockerLevel = 1;
+            int pagedItemLevel = 0;
+            bool shouldThrowException = false;
+            foreach (ElementType elementType in _elements.Peek().Select(x => x.Item1).Reverse())
+            {
+                bool shouldBreak = false;
+                switch (elementType)
+                {
+                    case ElementType.ConditionalBlocker:
+                        if (conditionalBlockerLevel == 1)
+                        {
+                            shouldThrowException = pagedItemLevel != 0;
+                            shouldBreak = true;
+                        }
+                        else
+                            conditionalBlockerLevel--;
+                        break;
+                    case ElementType.ConditionalBlockerDone:
+                        conditionalBlockerLevel++;
+                        break;
+                    case ElementType.PagedItem:
+                        pagedItemLevel++;
+                        break;
+                    case ElementType.PagedItemDone:
+                        pagedItemLevel--;
+                        break;
+                }
+                if (shouldBreak)
+                {
+                    break;
+                }
+            }
+            if (shouldThrowException)
+            {
+                throw new Exception("Conditional blocker must not cross paged item boundary!");
+            }
+            _conditionalBlockers.Push(_conditionalBlockers.Pop() - 1);
             _elements.Peek().Add((ElementType.ConditionalBlockerDone, null));
+            return this;
+        }
+
+        public PreferenceSystemManager AddPageSelector(int maxItemsPerPage)
+        {
+            foreach (ElementType elementType in _elements.Peek().Select(x => x.Item1))
+            {
+                if (IsSelectableElement(elementType))
+                    throw new Exception("Page selector must be the first selectable element!");
+            }
+            _elements.Peek().Add((ElementType.PageSelector, new PageSelectorData(maxItemsPerPage)));
+            return this;
+        }
+
+        public PreferenceSystemManager StartPagedItem()
+        {
+            if (!_elements.Peek().Select(x => x.Item1).Contains(ElementType.PageSelector))
+            {
+                throw new Exception("Cannot start paged item! PageSelector must be added first.");
+            }
+            bool shouldThrowException = false;
+            foreach (ElementType elementType in _elements.Peek().Select(x => x.Item1).Reverse())
+            {
+                bool isStartPagedItem = false;
+                bool shouldBreak = false;
+                switch (elementType)
+                {
+                    case ElementType.PagedItem:
+                        isStartPagedItem = true;
+                        shouldBreak = true;
+                        break;
+                    case ElementType.PagedItemDone:
+                    case ElementType.PageSelector:
+                        shouldBreak = true;
+                        break;
+                }
+                if (shouldBreak)
+                {
+                    if (isStartPagedItem)
+                        shouldThrowException = true;
+                    break;
+                }
+            }
+            if (shouldThrowException)
+            {
+                throw new Exception("Cannot start paged item! Terminate the previous paged item first.");
+            }
+            _elements.Peek().Add((ElementType.PagedItem, null));
+            return this;
+        }
+
+        public PreferenceSystemManager PagedItemDone()
+        {
+            bool shouldThrowException = true;
+            foreach (ElementType elementType in _elements.Peek().Select(x => x.Item1).Reverse())
+            {
+                bool isStartPagedItem = false;
+                bool shouldBreak = false;
+                switch (elementType)
+                {
+                    case ElementType.PagedItem:
+                        isStartPagedItem = true;
+                        shouldBreak = true;
+                        break;
+                    case ElementType.PagedItemDone:
+                    case ElementType.PageSelector:
+                        shouldBreak = true;
+                        break;
+                }
+                if (shouldBreak)
+                {
+                    if (isStartPagedItem)
+                        shouldThrowException = false;
+                    break;
+                }
+            }
+            if (shouldThrowException)
+            {
+                throw new Exception("No paged item to terminate.");
+            }
+            _elements.Peek().Add((ElementType.PagedItemDone, null));
             return this;
         }
 
@@ -836,6 +990,7 @@ namespace PreferenceSystem
             private readonly List<(ElementType, object)> _elements;
             private readonly ConfirmMenu<T> _confirmMenu;
             private List<bool> _isBlocking;
+            private int currentPage = 1;
 
             public Submenu(Transform container, ModuleList module_list, string ModGUID, PreferenceManager preferenceManager, List<(ElementType, object)> elements, ConfirmMenu<T> confirmMenu) : base(container, module_list)
             {
@@ -855,10 +1010,19 @@ namespace PreferenceSystem
             {
                 ModuleList.Clear();
                 _isBlocking.Clear();
+                int totalPagedItemsCount = _elements.Select(x => x.Item1).Where(x => x == ElementType.PagedItem).Count();
+                int startPagedItemIndex = 0;
+                int endPagedItemIndex = 0;
+                int currentPagedItemsDrawn = 0;
+                bool hasPageSelector = false;
+                bool isPagedItemBlocked = false;
                 for (int i = 0; i < _elements.Count; i++)
                 {
                     int elementIndex = i;
                     (ElementType type, object data) element = _elements[i];
+
+                    if (isPagedItemBlocked && element.type != ElementType.PagedItemDone)
+                        continue;
 
                     switch (element.type)
                     {
@@ -984,6 +1148,29 @@ namespace PreferenceSystem
                             break;
                         case ElementType.Spacer:
                             New<SpacerElement>();
+                            break;
+                        case ElementType.PageSelector:
+                            hasPageSelector = true;
+                            PageSelectorData pageSelectorData = (PageSelectorData)element.data;
+                            int pageSelectorMaxItems = Mathf.Max(1, pageSelectorData.MaxItemsPerPage);
+                            IEnumerable<int> pageIndex = Enumerable.Range(1, Mathf.CeilToInt(totalPagedItemsCount / (float)pageSelectorMaxItems));
+                            Option<int> pageSelectorOption = new Option<int>(pageIndex.ToList(), currentPage, pageIndex.Select(i => $"Page {i}").ToList());
+                            AddSelect(pageSelectorOption);
+                            pageSelectorOption.OnChanged += delegate (object _, int i)
+                            {
+                                currentPage = i;
+                                Redraw(player_id, elementIndex);
+                            };
+                            startPagedItemIndex = (currentPage - 1) * pageSelectorMaxItems;
+                            endPagedItemIndex = startPagedItemIndex + pageSelectorMaxItems - 1;
+                            break;
+                        case ElementType.PagedItem:
+                            if (hasPageSelector && (currentPagedItemsDrawn < startPagedItemIndex || currentPagedItemsDrawn > endPagedItemIndex))
+                                isPagedItemBlocked = true;
+                            currentPagedItemsDrawn++;
+                            break;
+                        case ElementType.PagedItemDone:
+                            isPagedItemBlocked = false;
                             break;
                         default:
                             break;
