@@ -144,7 +144,8 @@ namespace PreferenceSystem
 
         private static bool IsAllowedType(Type type, bool throwExceptionIfNotAllowed = false)
         {
-            if (!AllowedTypes.Contains(type))
+            if (!type.IsEnum &&
+                !AllowedTypes.Contains(type))
             {
                 if (throwExceptionIfNotAllowed)
                     ThrowTypeException();
@@ -161,7 +162,7 @@ namespace PreferenceSystem
                 allowedTypesStr += AllowedTypes[i].ToString();
                 if (i != AllowedTypes.Length - 1) allowedTypesStr += ", ";
             }
-            throw new ArgumentException($"Type TPref is not supported! Only use {allowedTypesStr}.");
+            throw new ArgumentException($"Type TPref is not supported! Only use enums, {allowedTypesStr}.");
         }
 
         private bool IsUsedKey(string key, bool throwExceptionIfUsed = false)
@@ -327,6 +328,22 @@ namespace PreferenceSystem
                     _elements.Peek().Add((ElementType.StringOption, new OptionData<string>(MOD_GUID, key, values.Cast<string>().ToList(), strings.ToList(), handler, redraw)));
                 }
             }
+            else if (typeof(T).IsEnum)
+            {
+                PreferenceString preference = _prefManager.RegisterPreference(new PreferenceString(key, initialValue.ToString()));
+                stringPreferences.Add(key, preference);
+
+                if (!doNotShow)
+                {
+                    EventHandler<string> handler = delegate (object _, string s)
+                    {
+                        Preference_OnChanged(key, s);
+                        if (on_changed != null)
+                            on_changed(ChangeType<T>(s));
+                    };
+                    _elements.Peek().Add((ElementType.StringOption, new OptionData<string>(MOD_GUID, key, values.Select(x => x.ToString()).ToList(), strings.ToList(), handler, redraw)));
+                }
+            }
             _registeredPreferences.Add(key, typeof(T));
             return this;
         }
@@ -362,6 +379,22 @@ namespace PreferenceSystem
             else if (valueType == typeof(string))
             {
                 value = _prefManager.GetPreference<PreferenceString>(key)?.Get();
+            }
+            else if (valueType.IsEnum)
+            {
+                value = _prefManager.GetPreference<PreferenceString>(key)?.Get();
+                if (value != null)
+                {
+                    try
+                    {
+                        value = Enum.Parse(valueType, value.ToString());
+                    }
+                    catch
+                    {
+                        Main.LogError($"Failed to parse {value} as {valueType}");
+                        value = null;
+                    }
+                }
             }
             return value;
         }
