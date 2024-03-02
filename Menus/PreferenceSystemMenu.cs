@@ -124,12 +124,13 @@ namespace PreferenceSystem.Menus
         public override void Setup(int player_id)
         {
             CurrentPage = 0;
-            if (!Pages.ContainsKey(GetType().GetGenericArguments()[0]))
-                Pages.Add(GetType().GetGenericArguments()[0], new List<int>());
-            if (!PageNames.ContainsKey(GetType().GetGenericArguments()[0]))
-                PageNames.Add(GetType().GetGenericArguments()[0], new List<string>());
+            Type mainOrPauseMenuType = GetType().GetGenericArguments()[0];
+            if (!Pages.ContainsKey(mainOrPauseMenuType))
+                Pages.Add(mainOrPauseMenuType, new List<int>());
+            if (!PageNames.ContainsKey(mainOrPauseMenuType))
+                PageNames.Add(mainOrPauseMenuType, new List<string>());
 
-            PageSelector = new Option<int>(Pages[GetType().GetGenericArguments()[0]], CurrentPage, PageNames[GetType().GetGenericArguments()[0]]);
+            PageSelector = new Option<int>(Pages[mainOrPauseMenuType], CurrentPage, PageNames[mainOrPauseMenuType]);
             PageSelector.OnChanged += delegate (object _, int result)
             {
                 CurrentPage = result;
@@ -143,20 +144,25 @@ namespace PreferenceSystem.Menus
         {
             ModuleList.Clear();
 
+            Type generic = GetType().GetGenericArguments()[0];
+
             AddLabel("Preference System");
             New<SpacerElement>(true);
 
-            if (Pages[GetType().GetGenericArguments()[0]].Count >= 2)
+            if (Pages[generic].Count >= 2)
             {
                 AddSelect<int>(PageSelector);
             }
 
             New<SpacerElement>(true);
 
+            bool hasMenus = false;
+
             foreach ((Type, Type) menu in RegisteredMenus.Keys)
             {
-                if (menu.Item2 == this.GetType().GetGenericArguments()[0])
+                if (menu.Item2 == generic)
                 {
+                    hasMenus = true;
                     if (MenuPages[menu] == pageNumber)
                     {
                         AddSubmenuButton(RegisteredMenus[menu], menu.Item1, false);
@@ -166,13 +172,19 @@ namespace PreferenceSystem.Menus
 
             foreach ((string, Type) menu in RegisteredButtons.Keys)
             {
-                if (menu.Item2 == this.GetType().GetGenericArguments()[0])
+                if (menu.Item2 == generic)
                 {
+                    hasMenus = true;
                     if (ButtonPages[menu] == pageNumber)
                     {
                         AddButton(menu.Item1, RegisteredButtons[menu]);
                     }
                 }
+            }
+
+            if (!hasMenus)
+            {
+                AddInfo($"No {generic.Name} preferences.");
             }
 
             New<SpacerElement>(true);
