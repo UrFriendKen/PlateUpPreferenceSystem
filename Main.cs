@@ -14,7 +14,7 @@ namespace PreferenceSystem
     {
         public const string MOD_GUID = "IcedMilo.PlateUp.PreferenceSystem";
         public const string MOD_NAME = "PreferenceSystem";
-        public const string MOD_VERSION = "1.0.9";
+        public const string MOD_VERSION = "1.0.10";
 
         internal static PreferenceSystemManager PrefManager;
 

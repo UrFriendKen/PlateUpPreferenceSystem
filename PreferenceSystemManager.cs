@@ -1,8 +1,8 @@
 ﻿using Kitchen;
 using Kitchen.Modules;
-using PreferenceSystem.Preferences;
 using PreferenceSystem.Event;
 using PreferenceSystem.Menus;
+using PreferenceSystem.Preferences;
 using PreferenceSystem.Utils;
 using System;
 using System.Collections.Generic;
@@ -40,10 +40,10 @@ namespace PreferenceSystem
         private PreferenceManager _prefManager;
 
         private Dictionary<string, Type> _registeredPreferences = new Dictionary<string, Type>();
-        private Dictionary<string, PreferenceBool> boolPreferences = new Dictionary<string, PreferenceBool>();
-        private Dictionary<string, PreferenceInt> intPreferences = new Dictionary<string, PreferenceInt>();
-        private Dictionary<string, PreferenceFloat> floatPreferences = new Dictionary<string, PreferenceFloat>();
-        private Dictionary<string, PreferenceString> stringPreferences = new Dictionary<string, PreferenceString>();
+        private Dictionary<string, Action<bool>> boolPreferencesOnChanged = new Dictionary<string, Action<bool>>();
+        private Dictionary<string, Action<int>> intPreferencesOnChanged = new Dictionary<string, Action<int>>();
+        private Dictionary<string, Action<float>> floatPreferencesOnChanged = new Dictionary<string, Action<float>>();
+        private Dictionary<string, Action<string>> stringPreferencesOnChanged = new Dictionary<string, Action<string>>();
 
         private Dictionary<string, object> _defaultValues;
         public Dictionary<string, object> Defaults => new Dictionary<string, object>(_defaultValues);
@@ -270,7 +270,9 @@ namespace PreferenceSystem
             if (typeof(T) == typeof(bool))
             {
                 PreferenceBool preference = _prefManager.RegisterPreference(new PreferenceBool(key, ChangeType<bool>(initialValue)));
-                boolPreferences.Add(key, preference);
+                if (on_changed != null)
+                    boolPreferencesOnChanged[key] = ChangeType<Action<bool>>(on_changed);
+
                 if (!doNotShow)
                 {
                     EventHandler<bool> handler = delegate (object _, bool b)
@@ -285,7 +287,9 @@ namespace PreferenceSystem
             else if (typeof(T) == typeof(int))
             {
                 PreferenceInt preference = _prefManager.RegisterPreference(new PreferenceInt(key, ChangeType<int>(initialValue)));
-                intPreferences.Add(key, preference);
+                if (on_changed != null)
+                    intPreferencesOnChanged[key] = ChangeType<Action<int>>(on_changed);
+
                 if (!doNotShow)
                 {
                     EventHandler<int> handler = delegate (object _, int i)
@@ -300,7 +304,8 @@ namespace PreferenceSystem
             else if (typeof(T) == typeof(float))
             {
                 PreferenceFloat preference = _prefManager.RegisterPreference(new PreferenceFloat(key, ChangeType<float>(initialValue)));
-                floatPreferences.Add(key, preference);
+                if (on_changed != null)
+                    floatPreferencesOnChanged[key] = ChangeType<Action<float>>(on_changed);
                 if (!doNotShow)
                 {
                     EventHandler<float> handler = delegate (object _, float f)
@@ -315,7 +320,8 @@ namespace PreferenceSystem
             else if (typeof(T) == typeof(string))
             {
                 PreferenceString preference = _prefManager.RegisterPreference(new PreferenceString(key, ChangeType<string>(initialValue)));
-                stringPreferences.Add(key, preference);
+                if (on_changed != null)
+                    stringPreferencesOnChanged[key] = ChangeType<Action<string>>(on_changed);
 
                 if (!doNotShow)
                 {
@@ -331,7 +337,11 @@ namespace PreferenceSystem
             else if (typeof(T).IsEnum)
             {
                 PreferenceString preference = _prefManager.RegisterPreference(new PreferenceString(key, initialValue.ToString()));
-                stringPreferences.Add(key, preference);
+                if (on_changed != null)
+                    stringPreferencesOnChanged[key] = (string s) =>
+                    {
+                        on_changed(ChangeType<T>(s));
+                    }; 
 
                 if (!doNotShow)
                 {
@@ -416,19 +426,38 @@ namespace PreferenceSystem
 
             if (valueType == typeof(bool))
             {
-                _prefManager.GetPreference<PreferenceBool>(key)?.Set(ChangeType<bool>(value));
+                bool b = ChangeType<bool>(value);
+                _prefManager.GetPreference<PreferenceBool>(key)?.Set(b);
+                if (boolPreferencesOnChanged.TryGetValue(key, out var on_changed))
+                    on_changed(b);
             }
             else if (valueType == typeof(int))
             {
-                _prefManager.GetPreference<PreferenceInt>(key)?.Set(ChangeType<int>(value));
+                int i = ChangeType<int>(value);
+                _prefManager.GetPreference<PreferenceInt>(key)?.Set(i);
+                if (intPreferencesOnChanged.TryGetValue(key, out var on_changed))
+                    on_changed(i);
             }
             else if (valueType == typeof(float))
             {
-                _prefManager.GetPreference<PreferenceFloat>(key)?.Set(ChangeType<float>(value));
+                float f = ChangeType<float>(value);
+                _prefManager.GetPreference<PreferenceFloat>(key)?.Set(f);
+                if (floatPreferencesOnChanged.TryGetValue(key, out var on_changed))
+                    on_changed(f);
             }
             else if (valueType == typeof(string))
             {
-                _prefManager.GetPreference<PreferenceString>(key)?.Set(ChangeType<string>(value));
+                string s = ChangeType<string>(value);
+                _prefManager.GetPreference<PreferenceString>(key)?.Set(s);
+                if (stringPreferencesOnChanged.TryGetValue(key, out var on_changed))
+                    on_changed(s);
+            }
+            else if (valueType.IsEnum)
+            {
+                string s = value.ToString();
+                _prefManager.GetPreference<PreferenceString>(key)?.Set(s);
+                if (stringPreferencesOnChanged.TryGetValue(key, out var on_changed))
+                    on_changed(s);
             }
             Save();
         }
@@ -778,6 +807,44 @@ namespace PreferenceSystem
             return this;
         }
 
+        public PreferenceSystemManager AddResetPreferencesButton(string button_text, Action onReset = null, bool requireConfirm = true, string confirmInfoText = "Are you sure you want to reset all preferences?", int arg = 0, float scale = 1f, float padding = 0.2f)
+        {
+            Action<int> onChanged = (int _) =>
+            {
+                ResetToDefault();
+                if (onReset != null)
+                    onReset();
+            };
+
+            if (requireConfirm)
+            {
+                AddButtonWithConfirm(button_text, confirmInfoText, (GenericChoiceDecision gcd) =>
+                {
+                    switch (gcd)
+                    {
+                        case GenericChoiceDecision.Accept:
+                            onChanged(arg);
+                            break;
+                        default:
+                            break;
+                    }
+                }, arg, scale, padding);
+            }
+            else
+            {
+                AddButton(button_text, onChanged, arg, scale, padding);
+            }
+            return this;
+
+            _elements.Peek().Add((ElementType.Button, new ButtonData(button_text, (int _) =>
+            {
+                ResetToDefault();
+                if (onReset != null)
+                    onReset();
+            }, arg, scale, padding)));
+            return this;
+        }
+
         public PreferenceSystemManager AddSpacer()
         {
             _elements.Peek().Add((ElementType.Spacer, null));
@@ -929,6 +996,29 @@ namespace PreferenceSystem
             return this;
         }
 
+        public void ResetToDefault()
+        {
+            if (_defaultValues == null)
+                return;
+
+            foreach (KeyValuePair<string, Type> pref in _registeredPreferences)
+            {
+                Set(pref.Key, pref.Value, _defaultValues[pref.Key]);
+            }
+        }
+
+        private void PopulateDefaults()
+        {
+            if (_defaultValues == null)
+            {
+                _defaultValues = new Dictionary<string, object>();
+                foreach (KeyValuePair<string, Type> pref in _registeredPreferences)
+                {
+                    _defaultValues.Add(pref.Key, Get(pref.Key, pref.Value));
+                }
+            }
+        }
+
         private Type CreateTypeKey(string typeName)
         {
             //Creating dummy types to use as keys for submenu instances when registering the submenus to keys in CreateSubmenusEvent
@@ -943,18 +1033,6 @@ namespace PreferenceSystem
             _conditionalBlockers.Pop();
             _mainMenuTypeKeys.Enqueue(_tempMainMenuTypeKeys.Pop());
             _pauseMenuTypeKeys.Enqueue(_tempPauseMenuTypeKeys.Pop());
-        }
-
-        private void PopulateDefaults()
-        {
-            if (_defaultValues == null)
-            {
-                _defaultValues = new Dictionary<string, object>();
-                foreach (KeyValuePair<string, Type> pref in _registeredPreferences)
-                {
-                    _defaultValues.Add(pref.Key, Get(pref.Key, pref.Value));
-                }
-            }
         }
 
         public void RegisterMenu(MenuType menuType)
