@@ -33,9 +33,9 @@ namespace PreferenceSystem.Preferences
         public PreferenceManager(string modId)
         {
             this.modId = modId;
-            if (!Directory.Exists(PREFERENCE_FOLDER_PATH + "/" + this.modId))
+            if (!System.IO.Directory.Exists(PREFERENCE_FOLDER_PATH + "/" + this.modId))
             {
-                Directory.CreateDirectory(PREFERENCE_FOLDER_PATH + "/" + this.modId);
+                System.IO.Directory.CreateDirectory(PREFERENCE_FOLDER_PATH + "/" + this.modId);
             }
             preferenceFilePath = PREFERENCE_FOLDER_PATH + "/" + this.modId + "/" + this.modId + currentProfile + ".json";
         }
@@ -69,6 +69,18 @@ namespace PreferenceSystem.Preferences
             }
             Main.LogWarning("Unable to get preference with " + key + ", key not registered.");
             return null;
+        }
+
+        /// <summary>
+        /// Get the preference associated with a given key. Preferences need to be registered with 
+        /// <see cref="M:PreferenceSystem.Preferences.PreferenceManager.RegisterPreference``1(``0)" /> before using this.
+        /// </summary>
+        /// <typeparam name="T">The type of the preference.</typeparam>
+        /// <param name="key">The key of the preference.</param>
+        /// <returns>The requested preference.</returns>
+        public bool HasPreference<T>(string key) where T : PreferenceBase
+        {
+            return preferences.ContainsKey((key, typeof(T).Name));
         }
 
         /// <summary>
@@ -139,7 +151,7 @@ namespace PreferenceSystem.Preferences
         public void Load()
         {
             string value = "";
-            if (File.Exists(preferenceFilePath))
+            if (System.IO.File.Exists(preferenceFilePath))
             {
                 value = File.ReadAllText(preferenceFilePath);
             }

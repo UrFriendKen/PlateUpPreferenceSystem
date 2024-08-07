@@ -22,6 +22,7 @@ namespace PreferenceSystem.Patches
             GameData.Main.GlobalLocalisation["MENU_ACTIVE_CARDS"],
             GameData.Main.GlobalLocalisation["MENU_PRACTICE_MODE"],
             GameData.Main.GlobalLocalisation["MENU_OPTIONS"],
+            GameData.Main.GlobalLocalisation["MAIN_MENU_ONLINE_PLAY"],
             GameData.Main.GlobalLocalisation["MENU_REMOVE_INPUT"],
             GameData.Main.GlobalLocalisation["MENU_MULTIPLAYER"],
             GameData.Main.GlobalLocalisation["MENU_ABANDON"],
@@ -33,32 +34,32 @@ namespace PreferenceSystem.Patches
             Main.CONSOLIDATION_WARNING_TEXT
         };
 
-        [HarmonyPatch(typeof(Menu<PauseMenuAction>), "AddSubmenuButton")]
+        [HarmonyPatch(typeof(Menu<MenuAction>), "AddSubmenuButton")]
         [HarmonyPrefix]
-        static bool AddSubmenuButton_Patch(Menu<PauseMenuAction> __instance, string label, Type menu, bool skip_stack = false)
+        static bool AddSubmenuButton_Patch(Menu<MenuAction> __instance, string label, Type menu, bool skip_stack = false)
         {
             if ((Main.PrefManager?.Get<bool>(Main.CONSOLIDATE_MODDED_ROOT_BUTTONS_ID) ?? false) &&
                 __instance.GetType() == typeof(MainMenu) && !_ignoredLabels.Contains(label))
             {
                 if (!InterceptedRootButtons.ContainsKey(label))
                 {
-                    PreferenceSystemMenu<PauseMenuAction>.RegisterMenu(label, menu, typeof(PauseMenuAction));
+                    PreferenceSystemMenu<MenuAction>.RegisterMenu(label, menu, typeof(MenuAction));
                 }
                 return false;
             }
             return true;
         }
 
-        [HarmonyPatch(typeof(Menu<PauseMenuAction>), "AddButton")]
+        [HarmonyPatch(typeof(Menu<MenuAction>), "AddButton")]
         [HarmonyPrefix]
-        static bool AddButton_Patch(Menu<PauseMenuAction> __instance, string label, Action<int> on_activate)
+        static bool AddButton_Patch(Menu<MenuAction> __instance, string label, Action<int> on_activate)
         {
             if ((Main.PrefManager?.Get<bool>(Main.CONSOLIDATE_MODDED_ROOT_BUTTONS_ID) ?? false) &&
                 __instance.GetType() == typeof(MainMenu) && !_ignoredLabels.Contains(label))
             {
                 if (!InterceptedRootButtons.ContainsKey(label))
                 {
-                    PreferenceSystemMenu<PauseMenuAction>.RegisterButton(label, on_activate, typeof(PauseMenuAction));
+                    PreferenceSystemMenu<MenuAction>.RegisterButton(label, on_activate, typeof(MenuAction));
                 }
                 return false;
             }

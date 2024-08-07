@@ -36,12 +36,12 @@
 	  <None Remove="*.png" />
 	</ItemGroup>
 	<ItemGroup>
+	  <Compile Remove="Effects\EffectConditions.cs" />
 	  <Compile Remove="Menus\PreferenceSetsMenu.cs" />
-	  <Compile Remove="Patches\ModsPreferencesMenu_Patch.cs" />
 	</ItemGroup>
 	<ItemGroup>
+	  <None Include="Effects\EffectConditions.cs" />
 	  <None Include="Menus\PreferenceSetsMenu.cs" />
-	  <None Include="Patches\ModsPreferencesMenu_Patch.cs" />
 	</ItemGroup>
   
 	<ItemGroup>

@@ -12,7 +12,7 @@ namespace PreferenceSystem.Utils
             using (var memoryStream = new MemoryStream())
             {
                 using (var deflateStream = new DeflateStream(memoryStream, CompressionMode.Compress, true))
-                using (var writer = new StreamWriter(deflateStream))
+                using (var writer = new System.IO.StreamWriter(deflateStream))
                 {
                     writer.Write(text);
                 }
@@ -31,7 +31,7 @@ namespace PreferenceSystem.Utils
             using (var memoryStream = new MemoryStream(compressedBytes))
             {
                 using (var deflateStream = new DeflateStream(memoryStream, CompressionMode.Decompress))
-                using (var reader = new StreamReader(deflateStream))
+                using (var reader = new System.IO.StreamReader(deflateStream))
                 {
                     decompressedString = reader.ReadToEnd();
                 }

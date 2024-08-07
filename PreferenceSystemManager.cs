@@ -58,16 +58,19 @@ namespace PreferenceSystem
 
         public static Dictionary<string, Type> AllowedTypesDict => AllowedTypes.ToDictionary(x => x.FullName, x => x);
 
-
-        private bool _mainMenuRegistered = false;
-        private bool _pauseMenuRegistered = false;
-        private Type _mainTopLevelTypeKey;
-        private Type _pauseTopLevelTypeKey;
-        private Queue<Type> _mainMenuTypeKeys = new Queue<Type>();
-        private Queue<Type> _pauseMenuTypeKeys = new Queue<Type>();
+        private bool _menuRegistered = false;
+        //private bool _mainMenuRegistered = false;
+        //private bool _pauseMenuRegistered = false;
+        private Type _topLevelTypeKey;
+        //private Type _mainTopLevelTypeKey;
+        //private Type _pauseTopLevelTypeKey;
+        private Queue<Type> _menuTypeKeys = new Queue<Type>();
+        //private Queue<Type> _mainMenuTypeKeys = new Queue<Type>();
+        //private Queue<Type> _pauseMenuTypeKeys = new Queue<Type>();
         private Queue<List<(ElementType, object)>> _completedElements = new Queue<List<(ElementType, object)>>();
-        private Stack<Type> _tempMainMenuTypeKeys = new Stack<Type>();
-        private Stack<Type> _tempPauseMenuTypeKeys = new Stack<Type>();
+        private Stack<Type> _tempMenuTypeKeys = new Stack<Type>();
+        //private Stack<Type> _tempMainMenuTypeKeys = new Stack<Type>();
+        //private Stack<Type> _tempPauseMenuTypeKeys = new Stack<Type>();
         private Stack<List<(ElementType, object)>> _elements = new Stack<List<(ElementType, object)>>();
         private Stack<int> _conditionalBlockers = new Stack<int>();
 
@@ -132,8 +135,9 @@ namespace PreferenceSystem
             _assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName($"{this.GetType().Namespace}.{MOD_GUID}"), AssemblyBuilderAccess.Run);
             _moduleBuilder = _assemblyBuilder.DefineDynamicModule("Module");
 
-            _mainTopLevelTypeKey = CreateTypeKey($"{sWhitespace.Replace(MOD_NAME, "")}_Main");
-            _pauseTopLevelTypeKey = CreateTypeKey($"{sWhitespace.Replace(MOD_NAME, "")}_Pause");
+            _topLevelTypeKey = CreateTypeKey($"{sWhitespace.Replace(MOD_NAME, "")}");
+            //_mainTopLevelTypeKey = CreateTypeKey($"{sWhitespace.Replace(MOD_NAME, "")}_Main");
+            //_pauseTopLevelTypeKey = CreateTypeKey($"{sWhitespace.Replace(MOD_NAME, "")}_Pause");
             _elements.Push(new List<(ElementType, object)>());
             _conditionalBlockers.Push(0);
 
@@ -369,6 +373,52 @@ namespace PreferenceSystem
             return (T)(Get(key, typeof(T)) ?? default(T));
         }
 
+        /// <summary>
+        /// Try to retrieve preference value
+        /// </summary>
+        /// <typeparam name="T">Type of preference value.</typeparam>
+        /// <param name="key">Unique preference identifier</param>
+        /// <param name="value">Value of preference, if it exists. Otherwise, default</param>
+        /// <returns>True if value successfully retrieved, otherwise false. Value of preference. If preference does not exist, default is returned instead.</returns>
+        public bool TryGet<T>(string key, out T value)
+        {
+            if (!Has<T>(key))
+            {
+                value = default;
+                return false;
+            }
+            value = Get<T>(key);
+            return true;
+        }
+
+        /// <summary>
+        /// Check if prference key is registered
+        /// </summary>
+        /// <typeparam name="T">Type of preference value.</typeparam>
+        /// <param name="key">Unique preference identifier</param>
+        /// <returns></returns>
+        public bool Has<T>(string key)
+        {
+            return Has(key, typeof(T));
+        }
+
+        private bool Has(string key, Type valueType)
+        {
+            IsAllowedType(valueType, true);
+            
+            if (valueType == typeof(bool))
+                return _prefManager.HasPreference<PreferenceBool>(key);
+            else if (valueType == typeof(int))
+                return _prefManager.HasPreference<PreferenceInt>(key);
+            else if (valueType == typeof(float))
+                return _prefManager.HasPreference<PreferenceFloat>(key);
+            else if (valueType == typeof(string))
+                return _prefManager.HasPreference<PreferenceString>(key);
+            else if (valueType.IsEnum)
+                return _prefManager.HasPreference<PreferenceString>(key);
+            return false;
+        }
+
         private object Get(string key, Type valueType)
         {
             IsAllowedType(valueType, true);
@@ -586,6 +636,7 @@ namespace PreferenceSystem
             public readonly int Arg;
             public readonly float Scale;
             public readonly float Padding;
+            public readonly bool CloseOnPress;
             public ButtonData(string button_text, Action<int> on_activate, int arg = 0, float scale = 1f, float padding = 0.2f)
             {
                 ButtonText = button_text;
@@ -593,6 +644,15 @@ namespace PreferenceSystem
                 Arg = arg;
                 Scale = scale;
                 Padding = padding;
+            }
+            public ButtonData(string button_text, Action<int> on_activate, bool closeOnPress = false, int arg = 0, float scale = 1f, float padding = 0.2f)
+            {
+                ButtonText = button_text;
+                OnActivate = on_activate;
+                Arg = arg;
+                Scale = scale;
+                Padding = padding;
+                CloseOnPress = closeOnPress;
             }
         }
         private readonly struct ButtonWithConfirmData
@@ -636,14 +696,14 @@ namespace PreferenceSystem
         private readonly struct SubmenuButtonData
         {
             public readonly string ButtonText;
-            public readonly Type MainMenuKey;
-            public readonly Type PauseMenuKey;
+            public readonly Type MenuKey;
+            //public readonly Type MainMenuKey;
+            //public readonly Type PauseMenuKey;
             public readonly bool SkipStack;
-            public SubmenuButtonData(string button_text, Type main_menu_key, Type pause_menu_key, bool skip_stack = false)
+            public SubmenuButtonData(string button_text, Type menu_key, bool skip_stack = false)
             {
                 ButtonText = button_text;
-                MainMenuKey = main_menu_key;
-                PauseMenuKey = pause_menu_key;
+                MenuKey = menu_key;
                 SkipStack = skip_stack;
             }
         }
@@ -651,20 +711,19 @@ namespace PreferenceSystem
         {
             public readonly Type MenuType;
             public readonly string ButtonText;
-            private readonly PauseMenuAction PauseAction;
-            private readonly MainMenuAction MainAction;
-            public object Action => (MenuType == typeof(MainMenuAction)) ? MainAction : ((MenuType == typeof(PauseMenuAction)) ? PauseAction : null);
+            private readonly MenuAction MenuAction;
+            public object Action => (MenuType == typeof(MenuAction)) ? MenuAction.Action : ((MenuType == typeof(MenuAction)) ? MenuAction.PauseAction : null);
             public ActionButtonData(string button_text, object action)
             {
                 ButtonText = button_text;
                 MenuType = action.GetType();
                 if (action is MainMenuAction mainMenuAction)
                 {
-                    MainAction = mainMenuAction;
+                    MenuAction = new MenuAction(mainMenuAction);
                 }
                 else if (action is PauseMenuAction pauseMenuAction)
                 {
-                    PauseAction = pauseMenuAction;
+                    MenuAction = new MenuAction(pauseMenuAction);
                 }
                 else
                 {
@@ -748,6 +807,12 @@ namespace PreferenceSystem
             return this;
         }
 
+        public PreferenceSystemManager AddButton(string button_text, Action<int> on_activate, bool closeOnPress, int arg = 0, float scale = 1f, float padding = 0.2f)
+        {
+            _elements.Peek().Add((ElementType.Button, new ButtonData(button_text, on_activate, closeOnPress, arg, scale, padding)));
+            return this;
+        }
+
         public PreferenceSystemManager AddButtonWithConfirm(string button_text, string info_text, Action<GenericChoiceDecision> callback, int arg = 0, float scale = 1f, float padding = 0.2f)
         {
             _elements.Peek().Add((ElementType.ButtonWithConfirm, new ButtonWithConfirmData(button_text, info_text, callback, arg, scale, padding)));
@@ -762,25 +827,21 @@ namespace PreferenceSystem
 
         public PreferenceSystemManager AddSubmenu(string button_text, string submenu_key, bool skip_stack = false)
         {
-            Type mainTypeKey = CreateTypeKey($"{sWhitespace.Replace(MOD_NAME, "")}_{sWhitespace.Replace(submenu_key, "")}_Main");
-            Type pauseTypeKey = CreateTypeKey($"{sWhitespace.Replace(MOD_NAME, "")}_{sWhitespace.Replace(submenu_key, "")}_Pause");
-            if (_mainMenuTypeKeys.Contains(mainTypeKey) || _tempMainMenuTypeKeys.Contains(mainTypeKey))
+            Type typeKey = CreateTypeKey($"{sWhitespace.Replace(MOD_NAME, "")}_{sWhitespace.Replace(submenu_key, "")}");
+            if (_menuTypeKeys.Contains(typeKey) || _tempMenuTypeKeys.Contains(typeKey))
             {
                 throw new ArgumentException("Submenu key already exists!");
             }
-            _tempMainMenuTypeKeys.Push(mainTypeKey);
-            _tempPauseMenuTypeKeys.Push(pauseTypeKey);
-            _elements.Peek().Add((ElementType.SubmenuButton, new SubmenuButtonData(button_text, mainTypeKey, pauseTypeKey, skip_stack)));
+            _tempMenuTypeKeys.Push(typeKey);
+            _elements.Peek().Add((ElementType.SubmenuButton, new SubmenuButtonData(button_text, typeKey, skip_stack)));
             _elements.Push(new List<(ElementType, object)>());
             _conditionalBlockers.Push(0);
             return this;
         }
 
-        public PreferenceSystemManager AddSelfRegisteredSubmenu<TMain, TPause>(string button_text, bool skip_stack = false) where TMain : Menu<MainMenuAction> where TPause : Menu<PauseMenuAction>
+        public PreferenceSystemManager AddSelfRegisteredSubmenu<TMenu>(string button_text, bool skip_stack = false) where TMenu : Menu<MenuAction>
         {
-            Type mainMenuType = typeof(TMain);
-            Type pauseMenuType = typeof(TPause);
-            _elements.Peek().Add((ElementType.SubmenuButton, new SubmenuButtonData(button_text, mainMenuType, pauseMenuType, skip_stack)));
+            _elements.Peek().Add((ElementType.SubmenuButton, new SubmenuButtonData(button_text, typeof(TMenu), skip_stack)));
             return this;
         }
 
@@ -834,14 +895,6 @@ namespace PreferenceSystem
             {
                 AddButton(button_text, onChanged, arg, scale, padding);
             }
-            return this;
-
-            _elements.Peek().Add((ElementType.Button, new ButtonData(button_text, (int _) =>
-            {
-                ResetToDefault();
-                if (onReset != null)
-                    onReset();
-            }, arg, scale, padding)));
             return this;
         }
 
@@ -1031,8 +1084,7 @@ namespace PreferenceSystem
         {
             _completedElements.Enqueue(_elements.Pop());
             _conditionalBlockers.Pop();
-            _mainMenuTypeKeys.Enqueue(_tempMainMenuTypeKeys.Pop());
-            _pauseMenuTypeKeys.Enqueue(_tempPauseMenuTypeKeys.Pop());
+            _menuTypeKeys.Enqueue(_tempMenuTypeKeys.Pop());
         }
 
         public void RegisterMenu(MenuType menuType)
@@ -1041,8 +1093,7 @@ namespace PreferenceSystem
 
             _prefManager.SetProfile(GlobalPreferences.GetProfile(MOD_GUID));
             Load();
-            _tempMainMenuTypeKeys.Push(_mainTopLevelTypeKey);
-            _tempPauseMenuTypeKeys.Push(_pauseTopLevelTypeKey);
+            _tempMenuTypeKeys.Push(_topLevelTypeKey);
 
             if (!_isPreferencesEventsRegistered)
             {
@@ -1055,42 +1106,47 @@ namespace PreferenceSystem
                 while (_completedElements.Count > 0)
                 {
                     List<(ElementType, object)> submenuElements = _completedElements.Dequeue();
-                    Type mainMenuKey = _mainMenuTypeKeys.Dequeue();
-                    Type pauseMenuKey = _pauseMenuTypeKeys.Dequeue();
+                    Type menuKey = _menuTypeKeys.Dequeue();
 
                     Events.PreferenceMenu_MainMenu_CreateSubmenusEvent += (s, args) =>
                     {
-                        if (!args.Menus.TryGetValue(typeof(ConfirmMenu<MainMenuAction>), out Menu<MainMenuAction> confirmMenu))
+                        if (!args.Menus.TryGetValue(typeof(ConfirmMenu<MenuAction>), out Menu<MenuAction> confirmMenu))
                         {
-                            confirmMenu = new ConfirmMenu<MainMenuAction>(args.Container, args.Module_list);
-                            args.Menus.Add(typeof(ConfirmMenu<MainMenuAction>), confirmMenu);
+                            confirmMenu = new ConfirmMenu<MenuAction>(args.Container, args.Module_list);
+                            args.Menus.Add(typeof(ConfirmMenu<MenuAction>), confirmMenu);
                         }
-                        Submenu<MainMenuAction> submenu = new Submenu<MainMenuAction>(args.Container, args.Module_list, MOD_GUID, _prefManager, submenuElements, (ConfirmMenu<MainMenuAction>)confirmMenu);
-                        args.Menus.Add(mainMenuKey, submenu);
+                        Submenu<MenuAction> submenu = new Submenu<MenuAction>(args.Container, args.Module_list, MOD_GUID, _prefManager, submenuElements, (ConfirmMenu<MenuAction>)confirmMenu);
+                        args.Menus.Add(menuKey, submenu);
                     };
 
                     Events.PreferenceMenu_PauseMenu_CreateSubmenusEvent += (s, args) =>
                     {
-                        if (!args.Menus.TryGetValue(typeof(ConfirmMenu<PauseMenuAction>), out Menu<PauseMenuAction> confirmMenu))
+                        if (!args.Menus.TryGetValue(typeof(ConfirmMenu<MenuAction>), out Menu<MenuAction> confirmMenu))
                         {
-                            confirmMenu = new ConfirmMenu<PauseMenuAction>(args.Container, args.Module_list);
-                            args.Menus.Add(typeof(ConfirmMenu<PauseMenuAction>), confirmMenu);
+                            confirmMenu = new ConfirmMenu<MenuAction>(args.Container, args.Module_list);
+                            args.Menus.Add(typeof(ConfirmMenu<MenuAction>), confirmMenu);
                         }
-                        Submenu<PauseMenuAction> submenu = new Submenu<PauseMenuAction>(args.Container, args.Module_list, MOD_GUID, _prefManager, submenuElements, (ConfirmMenu<PauseMenuAction>)confirmMenu);
-                        args.Menus.Add(pauseMenuKey, submenu);
+                        Submenu<MenuAction> submenu = new Submenu<MenuAction>(args.Container, args.Module_list, MOD_GUID, _prefManager, submenuElements, (ConfirmMenu<MenuAction>)confirmMenu);
+                        args.Menus.Add(menuKey, submenu);
                     };
                 }
             }
 
-            if (menuType == MenuType.MainMenu && !_mainMenuRegistered)
+            //if (menuType == MenuType.MainMenu && !_mainMenuRegistered)
+            //{
+            //    PreferenceSystemMenu<MenuAction>.RegisterMenu(MOD_NAME, _mainTopLevelTypeKey, typeof(MenuAction));
+            //    _mainMenuRegistered = true;
+            //}
+            //else if (menuType == MenuType.PauseMenu && !_pauseMenuRegistered)
+            //{
+            //    PreferenceSystemMenu<MenuAction>.RegisterMenu(MOD_NAME, _pauseTopLevelTypeKey, typeof(MenuAction));
+            //    _pauseMenuRegistered = true;
+            //}
+
+            if (!_menuRegistered)
             {
-                PreferenceSystemMenu<MainMenuAction>.RegisterMenu(MOD_NAME, _mainTopLevelTypeKey, typeof(MainMenuAction));
-                _mainMenuRegistered = true;
-            }
-            else if (menuType == MenuType.PauseMenu && !_pauseMenuRegistered)
-            {
-                PreferenceSystemMenu<PauseMenuAction>.RegisterMenu(MOD_NAME, _pauseTopLevelTypeKey, typeof(PauseMenuAction));
-                _pauseMenuRegistered = true;
+                PreferenceSystemMenu<MenuAction>.RegisterMenu(MOD_NAME, _topLevelTypeKey, typeof(MenuAction));
+                _menuRegistered = true;
             }
         }
 
@@ -1173,7 +1229,17 @@ namespace PreferenceSystem
                             break;
                         case ElementType.Button:
                             ButtonData buttonData = (ButtonData)element.data;
-                            AddButton(buttonData.ButtonText, buttonData.OnActivate, buttonData.Arg, buttonData.Scale, buttonData.Padding);
+
+                            Action<int> buttonDataOnActivate = buttonData.OnActivate;
+                            if (buttonData.CloseOnPress && typeof(T) == typeof(MenuAction))
+                            {
+                                buttonDataOnActivate = delegate (int i)
+                                {
+                                    buttonData.OnActivate(i);
+                                    RequestAction(ChangeType<T>(PauseMenuAction.CloseMenu));
+                                };
+                            }
+                            AddButton(buttonData.ButtonText, buttonDataOnActivate, buttonData.Arg, buttonData.Scale, buttonData.Padding);
                             break;
                         case ElementType.ActionButton:
                             ActionButtonData actionButtonData = (ActionButtonData)element.data;
@@ -1192,8 +1258,7 @@ namespace PreferenceSystem
                             break;
                         case ElementType.SubmenuButton:
                             SubmenuButtonData submenuButtonData = (SubmenuButtonData)element.data;
-                            Type submenuKey = typeof(T) == typeof(MainMenuAction) ? submenuButtonData.MainMenuKey : submenuButtonData.PauseMenuKey;
-                            AddSubmenuButton(submenuButtonData.ButtonText, submenuKey, submenuButtonData.SkipStack);
+                            AddSubmenuButton(submenuButtonData.ButtonText, submenuButtonData.MenuKey, submenuButtonData.SkipStack);
                             break;
                         case ElementType.BoolOption:
                             OptionData<bool> boolOptionData = (OptionData<bool>)element.data;

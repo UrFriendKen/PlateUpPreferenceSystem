@@ -18,8 +18,8 @@ namespace PreferenceSystem.Event
         public static EventHandler<MainMenu_SetupArgs> OptionsMenu_SetupEvent;
         public static EventHandler<PlayerPauseView_SetupMenusArgs> PlayerPauseView_SetupMenusEvent;
 
-        public static EventHandler<PreferenceMenu_CreateSubmenusArgs<MainMenuAction>> PreferenceMenu_MainMenu_CreateSubmenusEvent;
-        public static EventHandler<PreferenceMenu_CreateSubmenusArgs<PauseMenuAction>> PreferenceMenu_PauseMenu_CreateSubmenusEvent;
+        public static EventHandler<PreferenceMenu_CreateSubmenusArgs<MenuAction>> PreferenceMenu_MainMenu_CreateSubmenusEvent;
+        public static EventHandler<PreferenceMenu_CreateSubmenusArgs<MenuAction>> PreferenceMenu_PauseMenu_CreateSubmenusEvent;
     }
 
     public class PreferencesSaveArgs : EventArgs
@@ -44,9 +44,10 @@ namespace PreferenceSystem.Event
             this.module_list = module_list;
         }
 
-        public void AddMenu(object[] parameters)
+        public void AddMenu<T>(Type type, Menu<MenuAction> menuInstance, ModuleList module_list)
         {
-            addMenu.Invoke(instance, parameters);
+            addMenu.Invoke(instance, new object[] { type, menuInstance });
+            menuInstance.Style = ElementStyle.MainMenu;
         }
     }
 
@@ -151,9 +152,9 @@ namespace PreferenceSystem.Event
             this.module_list = module_list;
         }
 
-        public void AddMenu(object[] parameters)
+        public void AddMenu<T>(Type type, Menu<MenuAction> menuInstance)
         {
-            addMenu.Invoke(instance, parameters);
+            addMenu.Invoke(instance, new object[] { type, menuInstance });
         }
     }
 }

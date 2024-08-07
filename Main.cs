@@ -4,9 +4,7 @@ using KitchenMods;
 using PreferenceSystem.Event;
 using PreferenceSystem.Menus;
 using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
-using UnityEngine;
 
 namespace PreferenceSystem
 {
@@ -14,7 +12,7 @@ namespace PreferenceSystem
     {
         public const string MOD_GUID = "IcedMilo.PlateUp.PreferenceSystem";
         public const string MOD_NAME = "PreferenceSystem";
-        public const string MOD_VERSION = "1.0.10";
+        public const string MOD_VERSION = "1.0.11";
 
         internal static PreferenceSystemManager PrefManager;
 
@@ -44,8 +42,8 @@ namespace PreferenceSystem
         {
             LogWarning($"{MOD_GUID} v{MOD_VERSION} in use!");
 
-            if (!Directory.Exists($"{PreferenceSystemRegistry.PREFERENCE_SETS_FOLDER_PATH}"))
-                Directory.CreateDirectory($"{PreferenceSystemRegistry.PREFERENCE_SETS_FOLDER_PATH}");
+            if (!System.IO.Directory.Exists($"{PreferenceSystemRegistry.PREFERENCE_SETS_FOLDER_PATH}"))
+                System.IO.Directory.CreateDirectory($"{PreferenceSystemRegistry.PREFERENCE_SETS_FOLDER_PATH}");
 
             SetupMenus();
 
@@ -71,7 +69,7 @@ namespace PreferenceSystem
                 args.addSubmenuButton.Invoke(args.instance, new object[3]
                 {
                     "PreferenceSystem",
-                    typeof(PreferenceSystemMenu<MainMenuAction>),
+                    typeof(PreferenceSystemMenu<MenuAction>),
                     false
                 });
             };
@@ -79,8 +77,8 @@ namespace PreferenceSystem
             {
                 args.addMenu.Invoke(args.instance, new object[2]
                 {
-                    typeof(PreferenceSystemMenu<MainMenuAction>),
-                    new PreferenceSystemMenu<MainMenuAction>(args.instance.ButtonContainer, args.module_list)
+                    typeof(PreferenceSystemMenu<MenuAction>),
+                    new PreferenceSystemMenu<MenuAction>(args.instance.ButtonContainer, args.module_list)
                 });
             };
             Events.OptionsMenu_SetupEvent = delegate (object s, MainMenu_SetupArgs args)
@@ -88,7 +86,7 @@ namespace PreferenceSystem
                 args.addSubmenuButton.Invoke(args.instance, new object[3]
                 {
                     "PreferenceSystem",
-                    typeof(PreferenceSystemMenu<PauseMenuAction>),
+                    typeof(PreferenceSystemMenu<MenuAction>),
                     false
                 });
             };
@@ -96,15 +94,14 @@ namespace PreferenceSystem
             {
                 args.addMenu.Invoke(args.instance, new object[2]
                 {
-                    typeof(PreferenceSystemMenu<PauseMenuAction>),
-                    new PreferenceSystemMenu<PauseMenuAction>(args.instance.ButtonContainer, args.module_list)
+                    typeof(PreferenceSystemMenu<MenuAction>),
+                    new PreferenceSystemMenu<MenuAction>(args.instance.ButtonContainer, args.module_list)
                 });
             };
         }
 
         public void PreInject()
         {
-            //RegisterMenu<PreferenceSystemMenu>();
         }
 
         public void PostInject() { }

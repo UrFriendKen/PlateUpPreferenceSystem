@@ -140,6 +140,12 @@ namespace PreferenceSystem.Menus
             Redraw(CurrentPage);
         }
 
+        protected override ButtonElement AddSubmenuButton(string label, Type menu, bool skip_stack = false)
+        {
+            Main.LogInfo($"AddSubmenuButton {label} for menu: {menu}");
+            return base.AddSubmenuButton(label, menu, skip_stack);
+        }
+
         private void Redraw(int pageNumber = 0)
         {
             ModuleList.Clear();
@@ -205,10 +211,7 @@ namespace PreferenceSystem.Menus
 
         public override void CreateSubmenus(ref Dictionary<Type, Menu<T>> menus)
         {
-            if (this.GetType().GetGenericArguments()[0] == typeof(MainMenuAction))
-                EventUtils.InvokeEvent(nameof(Events.PreferenceMenu_MainMenu_CreateSubmenusEvent), Events.PreferenceMenu_MainMenu_CreateSubmenusEvent?.GetInvocationList(), null, new PreferenceMenu_CreateSubmenusArgs<T>(this, menus, this.Container, this.ModuleList));
-            else if (this.GetType().GetGenericArguments()[0] == typeof(PauseMenuAction))
-                EventUtils.InvokeEvent(nameof(Events.PreferenceMenu_PauseMenu_CreateSubmenusEvent), Events.PreferenceMenu_PauseMenu_CreateSubmenusEvent?.GetInvocationList(), null, new PreferenceMenu_CreateSubmenusArgs<T>(this, menus, this.Container, this.ModuleList));
+            EventUtils.InvokeEvent(nameof(Events.PreferenceMenu_MainMenu_CreateSubmenusEvent), Events.PreferenceMenu_MainMenu_CreateSubmenusEvent?.GetInvocationList(), null, new PreferenceMenu_CreateSubmenusArgs<T>(this, menus, this.Container, this.ModuleList));
         }
     }
 }

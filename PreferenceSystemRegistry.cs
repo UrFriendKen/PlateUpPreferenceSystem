@@ -309,12 +309,12 @@ namespace PreferenceSystem
 
         public static bool Export(string preferenceSetName, bool readOnlyMode, out PreferenceSet preferenceSet, out string statusMessage, string[] guids = null)
         {
-            if (!Directory.Exists($"{PREFERENCE_SETS_FOLDER_PATH}"))
-                Directory.CreateDirectory($"{PREFERENCE_SETS_FOLDER_PATH}");
+            if (!System.IO.Directory.Exists($"{PREFERENCE_SETS_FOLDER_PATH}"))
+                System.IO.Directory.CreateDirectory($"{PREFERENCE_SETS_FOLDER_PATH}");
 
             string filename = GetPreferenceSetFileName(preferenceSetName, DateTime.UtcNow);
             string filepath = $"{PREFERENCE_SETS_FOLDER_PATH}/{filename}";
-            if (File.Exists(filepath))
+            if (System.IO.File.Exists(filepath))
             {
                 preferenceSet = default;
                 statusMessage = $"{filename} is used.";
@@ -336,8 +336,8 @@ namespace PreferenceSystem
 
         public static bool Import(string base64, out string statusMessage, string nameOverride = null)
         {
-            if (!Directory.Exists($"{PREFERENCE_SETS_FOLDER_PATH}"))
-                Directory.CreateDirectory($"{PREFERENCE_SETS_FOLDER_PATH}");
+            if (!System.IO.Directory.Exists($"{PREFERENCE_SETS_FOLDER_PATH}"))
+                System.IO.Directory.CreateDirectory($"{PREFERENCE_SETS_FOLDER_PATH}");
 
             string json;
             try
@@ -369,7 +369,7 @@ namespace PreferenceSystem
             string filename = GetPreferenceSetFileName(preferenceSet.Name, DateTimeOffset.FromUnixTimeSeconds(preferenceSet.CreatedAt));
             string filepath = $"{PREFERENCE_SETS_FOLDER_PATH}/{filename}";
 
-            if (File.Exists(filepath))
+            if (System.IO.File.Exists(filepath))
             {
                 statusMessage = $"{filename} is used. If this preference set has not already been imported, please provide a new preference set name.";
                 return false;
@@ -443,8 +443,8 @@ namespace PreferenceSystem
 
         public static void InitPreferenceSets()
         {
-            if (!Directory.Exists($"{PREFERENCE_SETS_FOLDER_PATH}"))
-                Directory.CreateDirectory($"{PREFERENCE_SETS_FOLDER_PATH}");
+            if (!System.IO.Directory.Exists($"{PREFERENCE_SETS_FOLDER_PATH}"))
+                System.IO.Directory.CreateDirectory($"{PREFERENCE_SETS_FOLDER_PATH}");
             _preferenceSetsCache.Clear();
             _loadedPreferenceSetFilepaths.Clear();
             foreach (string filepath in Directory.GetFiles(PREFERENCE_SETS_FOLDER_PATH))
