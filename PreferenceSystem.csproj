@@ -36,11 +36,9 @@
 	  <None Remove="*.png" />
 	</ItemGroup>
 	<ItemGroup>
-	  <Compile Remove="Effects\EffectConditions.cs" />
 	  <Compile Remove="Menus\PreferenceSetsMenu.cs" />
 	</ItemGroup>
 	<ItemGroup>
-	  <None Include="Effects\EffectConditions.cs" />
 	  <None Include="Menus\PreferenceSetsMenu.cs" />
 	</ItemGroup>
   
