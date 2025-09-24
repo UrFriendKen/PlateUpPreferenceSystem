@@ -5,6 +5,7 @@ using PreferenceSystem.Event;
 using PreferenceSystem.Menus;
 using System.Collections.Generic;
 using System.Reflection;
+using UnityEngine;
 
 namespace PreferenceSystem
 {
@@ -12,7 +13,7 @@ namespace PreferenceSystem
     {
         public const string MOD_GUID = "IcedMilo.PlateUp.PreferenceSystem";
         public const string MOD_NAME = "PreferenceSystem";
-        public const string MOD_VERSION = "1.1.0";
+        public const string MOD_VERSION = "1.1.2";
 
         internal static PreferenceSystemManager PrefManager;
 
