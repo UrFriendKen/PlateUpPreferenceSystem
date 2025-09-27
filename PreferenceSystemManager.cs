@@ -914,6 +914,24 @@ namespace PreferenceSystem
             return this;
         }
 
+        public PreferenceSystemManager AddHostStatusConditionalBlocker(bool block_if_host = false, bool block_if_client = true)
+        {
+            if (block_if_host)
+            {
+                _elements.Peek().Add((ElementType.ConditionalBlocker, new ConditionalBlockerData(() => Session.HostIdentifier == 0)));
+                _conditionalBlockers.Push(_conditionalBlockers.Pop() + 1);
+
+            }
+
+            if (block_if_client)
+            {
+                _elements.Peek().Add((ElementType.ConditionalBlocker, new ConditionalBlockerData(() => Session.HostIdentifier != 0)));
+                _conditionalBlockers.Push(_conditionalBlockers.Pop() + 1);
+            }
+
+            return this;
+        }
+
         public PreferenceSystemManager AddConditionalBlocker(Func<bool> shouldBlock)
         {
             _elements.Peek().Add((ElementType.ConditionalBlocker, new ConditionalBlockerData(shouldBlock)));
