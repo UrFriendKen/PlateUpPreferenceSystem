@@ -4,6 +4,7 @@ using PreferenceSystem.Event;
 using PreferenceSystem.Utils;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace PreferenceSystem.Menus
@@ -71,6 +72,14 @@ namespace PreferenceSystem.Menus
                     PageNames[generic].Add("Page: " + page);
                 }
                 MenuPages.Add((type, generic), page);
+
+                //Rebuilding the pages in order to make entries are always sorted alphabetically
+                var registeredMenus = RegisteredMenus.Keys.OrderBy(e => e.Item1.Name).ToList();
+                for (var i = 0; i < registeredMenus.Count; i++)
+                {
+                    var registeredMenu = registeredMenus[i];
+                    MenuPages[registeredMenu] = i / 5;
+                }
             }
         }
 
@@ -164,7 +173,7 @@ namespace PreferenceSystem.Menus
 
             bool hasMenus = false;
 
-            foreach ((Type, Type) menu in RegisteredMenus.Keys)
+            foreach ((Type, Type) menu in RegisteredMenus.Keys.OrderBy(e => e.Item1.Name))
             {
                 if (menu.Item2 == generic)
                 {
